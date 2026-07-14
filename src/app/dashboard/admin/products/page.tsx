@@ -88,7 +88,7 @@ const ProductsPage = () => {
                 {[
                     { label: 'Total Products', value: meta.total || 0, icon: LuShoppingBag, color: 'blue' },
                     { label: 'Active', value: products.filter((p: any) => p.status === 'active').length, icon: LuBox, color: 'green' },
-                    { label: 'Low Stock', value: products.filter((p: any) => p.quantity <= p.lowStockThreshold).length, icon: LuChartColumn, color: 'orange' },
+                    { label: 'Low Stock', value: products.filter((p: any) => (p.stock ?? 0) <= (p.lowStockThreshold ?? 5)).length, icon: LuChartColumn, color: 'orange' },
                     { label: 'Featured', value: products.filter((p: any) => p.isFeatured).length, icon: LuEye, color: 'purple' },
                 ].map((stat, idx) => (
                     <div key={idx} className="bg-white p-4 rounded-md border border-gray-200 shadow-sm flex items-center gap-4 hover:shadow-md transition-all">
@@ -173,21 +173,21 @@ const ProductsPage = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <p className="font-bold text-gray-800">{formatCurrency(product.price)}</p>
-                                            {product.comparePrice > product.price && (
-                                                <p className="text-xs text-red-500 line-through">{formatCurrency(product.comparePrice)}</p>
+                                            {product.originalPrice > product.price && (
+                                                <p className="text-xs text-red-500 line-through">{formatCurrency(product.originalPrice)}</p>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col gap-1">
-                                                <p className={`text-sm font-bold ${product.quantity <= product.lowStockThreshold ? 'text-red-500' : 'text-gray-700'}`}>
-                                                    {product.quantity} units
+                                                <p className={`text-sm font-bold ${product.stock <= product.lowStockThreshold ? 'text-red-500' : 'text-gray-700'}`}>
+                                                    {product.stock} units
                                                 </p>
                                                 <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                                     <div
-                                                        className={`h-full rounded-full ${product.quantity === 0 ? 'bg-red-500' :
-                                                            product.quantity <= product.lowStockThreshold ? 'bg-orange-500' : 'bg-green-500'
+                                                        className={`h-full rounded-full ${product.stock === 0 ? 'bg-red-500' :
+                                                            product.stock <= product.lowStockThreshold ? 'bg-orange-500' : 'bg-green-500'
                                                             }`}
-                                                        style={{ width: `${Math.min(100, (product.quantity / 50) * 100)}%` }}
+                                                        style={{ width: `${Math.min(100, (product.stock / 50) * 100)}%` }}
                                                     ></div>
                                                 </div>
                                             </div>
@@ -244,7 +244,7 @@ const ProductsPage = () => {
                 )}
 
                 {/* Pagination */}
-                {meta.pages > 1 && (
+                {meta.totalPages > 1 && (
                     <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
                         <p className="text-sm text-gray-500">
                             Showing <span className="font-bold text-gray-800">{(page - 1) * 10 + 1}</span> to <span className="font-bold text-gray-800">{Math.min(page * 10, meta.total)}</span> of <span className="font-bold text-gray-800">{meta.total}</span> products
@@ -258,7 +258,7 @@ const ProductsPage = () => {
                                 Previous
                             </button>
                             <button
-                                disabled={page === meta.pages}
+                                disabled={page === meta.totalPages}
                                 onClick={() => setPage(page + 1)}
                                 className="px-4 py-2 bg-white border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-all shadow-sm"
                             >

@@ -933,6 +933,62 @@ const ProductFormInner = ({ productId: propProductId }: { productId?: string }) 
                     </div>
 
 
+                    {/* ── 6. Specifications & Highlights ─────────────── */}
+                    <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm space-y-5">
+                        <SectionHeader icon={<LuInfo size={20} />} title="Specifications & Highlights" color="bg-indigo-50 text-indigo-600" />
+
+                        {/* Highlights — bullet key selling points */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-gray-700">Highlights <span className="text-xs text-gray-400">(key selling points, shown as bullets on the product page)</span></label>
+                            {formData.highlights.map((h: string, i: number) => (
+                                <div key={i} className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={h}
+                                        placeholder={`Highlight ${i + 1} — e.g. "100% cotton, breathable"`}
+                                        className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-md text-sm outline-none focus:border-[var(--color-primary)]"
+                                        onChange={(e) => setFormData((prev: any) => { const hl = [...prev.highlights]; hl[i] = e.target.value; return { ...prev, highlights: hl }; })}
+                                    />
+                                    <button type="button" title="Remove" onClick={() => setFormData((prev: any) => ({ ...prev, highlights: prev.highlights.filter((_: any, idx: number) => idx !== i) }))}
+                                        className="px-3 rounded-md border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors">
+                                        <LuTrash2 size={15} />
+                                    </button>
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => setFormData((prev: any) => ({ ...prev, highlights: [...prev.highlights, ''] }))}
+                                className="text-sm font-semibold text-[var(--color-primary)] hover:underline">+ Add highlight</button>
+                        </div>
+
+                        {/* Specifications — key/value table */}
+                        <div className="space-y-2 pt-4 border-t border-gray-100">
+                            <label className="text-sm font-semibold text-gray-700">Specifications <span className="text-xs text-gray-400">(key–value table, e.g. Material → Cotton)</span></label>
+                            {formData.specifications.map((sp: any, i: number) => (
+                                <div key={i} className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={sp.key}
+                                        placeholder="Label (e.g. Material)"
+                                        className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-md text-sm outline-none focus:border-[var(--color-primary)]"
+                                        onChange={(e) => setFormData((prev: any) => { const specs = [...prev.specifications]; specs[i] = { ...specs[i], key: e.target.value }; return { ...prev, specifications: specs }; })}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={sp.value}
+                                        placeholder="Value (e.g. Cotton)"
+                                        className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-md text-sm outline-none focus:border-[var(--color-primary)]"
+                                        onChange={(e) => setFormData((prev: any) => { const specs = [...prev.specifications]; specs[i] = { ...specs[i], value: e.target.value }; return { ...prev, specifications: specs }; })}
+                                    />
+                                    <button type="button" title="Remove" onClick={() => setFormData((prev: any) => ({ ...prev, specifications: prev.specifications.filter((_: any, idx: number) => idx !== i) }))}
+                                        className="px-3 rounded-md border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-300 transition-colors">
+                                        <LuTrash2 size={15} />
+                                    </button>
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => setFormData((prev: any) => ({ ...prev, specifications: [...prev.specifications, { key: '', value: '' }] }))}
+                                className="text-sm font-semibold text-[var(--color-primary)] hover:underline">+ Add specification</button>
+                        </div>
+                    </div>
+
                     {/* ── 7. SEO ─────────────────────────────────────── */}
                     <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm space-y-5">
                         <SectionHeader icon={<LuGlobe size={20} />} title="SEO Optimization" color="bg-orange-50 text-orange-600" />

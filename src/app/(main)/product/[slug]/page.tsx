@@ -597,7 +597,11 @@ export default function ProductDetailsPage() {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                                     <LuShield size={15} style={{ color: '#6b7280', flexShrink: 0, marginTop: '1px' }} />
-                                    <span style={{ fontSize: '12px', color: '#444', lineHeight: 1.4 }}>{product.termsInfo && String(product.termsInfo).trim() ? String(product.termsInfo) : 'Warranty not available'}</span>
+                                    <span style={{ fontSize: '12px', color: '#444', lineHeight: 1.4 }}>{
+                                        product.warranty?.hasWarranty
+                                            ? `${product.warranty.duration || ''} ${product.warranty.durationUnit || ''} ${product.warranty.type && product.warranty.type !== 'none' ? product.warranty.type : ''} warranty`.replace(/\s+/g, ' ').trim()
+                                            : (product.termsInfo && String(product.termsInfo).trim() ? String(product.termsInfo) : 'No warranty')
+                                    }</span>
                                 </div>
                             </div>
 
@@ -611,6 +615,23 @@ export default function ProductDetailsPage() {
                         </div>
                         <div style={{ padding: '18px 22px', position: 'relative' }}>
                             <div style={{ maxHeight: detailsExpanded ? 'none' : '420px', overflow: 'hidden', position: 'relative' }}>
+                                {/* ── Highlights ── */}
+                                {product.highlights?.length > 0 && (
+                                    <div style={{ marginBottom: '20px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                            <span style={{ width: '3px', height: '16px', background: 'var(--color-primary)', borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                                            <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#111', margin: 0 }}>Highlights</h3>
+                                        </div>
+                                        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {product.highlights.map((h: string, i: number) => (
+                                                <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: '#444', lineHeight: 1.5 }}>
+                                                    <LuCircleCheck size={14} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
+                                                    <span>{h}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                                 {/* ── Specifications (Daraz-style) ── */}
                                 {hasSpecsSection && (
                                     <div style={{ marginBottom: '20px' }}>
