@@ -47,7 +47,8 @@ const NewHomePage: React.FC = () => {
     }, [page, selectedCategory, searchTerm]);
 
     const { data: productsData, isLoading, isFetching } = useGetProductsQuery(queryParams);
-    const { data: categoriesData } = useGetCategoriesQuery({});
+    // Only categories the admin has toggled to show on the homepage.
+    const { data: categoriesData } = useGetCategoriesQuery({ home: true });
 
     const products = productsData?.data || [];
     const meta = productsData?.meta;

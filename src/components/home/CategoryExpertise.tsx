@@ -69,7 +69,8 @@ const FALLBACK_CATEGORIES: Category[] = [
 ];
 
 const CategoryExpertise: React.FC<CategoryExpertiseProps> = ({ onClose }) => {
-    const { data: categoriesData } = useGetCategoriesQuery({});
+    // Only categories the admin has toggled to show on the homepage.
+    const { data: categoriesData } = useGetCategoriesQuery({ home: true });
     const apiCategories: Category[] = categoriesData?.data || [];
     // Only show top-level categories (not sub-categories) in the featured strip.
     const topLevel = apiCategories.filter((c) => !c.parent);

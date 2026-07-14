@@ -58,7 +58,8 @@ const Header: React.FC = () => {
     // Storefront wishlist page handles both logged-in (server) and guest (local) wishlists.
     const wishlistHref = '/wishlist';
 
-    const { data: categoriesData } = useGetCategoriesQuery({});
+    // Only categories the admin has toggled to show in the menu.
+    const { data: categoriesData } = useGetCategoriesQuery({ menu: true });
     const categories: Category[] = categoriesData?.data?.length > 0 ? categoriesData.data : FALLBACK_CATEGORIES;
     const { data: siteContentRes } = useGetSiteContentQuery(undefined);
     const contact = siteContentRes?.data?.contact || {};
