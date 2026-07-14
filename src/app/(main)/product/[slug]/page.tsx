@@ -108,6 +108,13 @@ export default function ProductDetailsPage() {
 
     const handleAddToCart = () => {
         if (!product) return;
+        // Enforce the variation choice (same guard as Buy Now) — otherwise the cart line
+        // silently gets a variant's price with no recorded color/size.
+        if ((colorSwatches.length > 0 && !selectedColor) || (sizeList.length > 0 && !selectedSize)) {
+            const need = [colorSwatches.length > 0 && !selectedColor ? 'color' : '', sizeList.length > 0 && !selectedSize ? 'size' : ''].filter(Boolean).join(' and ');
+            toast.error(`Please select ${need} first`);
+            return;
+        }
         const cartId = getCartId();
         if (isInCart) { setAddedToCart(true); setTimeout(() => setAddedToCart(false), 2000); return; }
         const variantImage = activeVariant?.images?.[0] || allImages[selectedImage] || product.thumbnail;
@@ -204,7 +211,13 @@ export default function ProductDetailsPage() {
         return map;
     })();
 
-    const activeVariant = hasVariants ? variants.find((v: any) => (!selectedColor || v.color === selectedColor) && (!selectedSize || v.size === selectedSize)) : null;
+    // Only resolve a variant AFTER the shopper has made a selection — otherwise the
+    // page would show variant #1's price/stock (and skip the base offer window) before
+    // anything is picked, disagreeing with the (empty) swatch/size selection UI.
+    const hasVariantSelection = !!selectedColor || !!selectedSize;
+    const activeVariant = hasVariants && hasVariantSelection
+        ? (variants.find((v: any) => (!selectedColor || v.color === selectedColor) && (!selectedSize || v.size === selectedSize)) || null)
+        : null;
     const availableSizesForColor = hasVariants && selectedColor ? variants.filter((v: any) => v.color === selectedColor).map((v: any) => v.size).filter(Boolean) : sizeList;
     const availableColorsForSize = hasVariants && selectedSize ? variants.filter((v: any) => v.size === selectedSize).map((v: any) => v.color).filter(Boolean) : colorSwatches.map((c: any) => c.name);
 
@@ -785,9 +798,11 @@ export default function ProductDetailsPage() {
                                                             <div style={{ display: 'flex', gap: '2px' }}>
                                                                 {[1,2,3,4,5].map(s => <LuStar key={s} size={11} style={{ color: s <= r.rating ? '#f59e0b' : '#d1d5db', fill: s <= r.rating ? '#f59e0b' : 'none' }} />)}
                                                             </div>
-                                                            <span style={{ fontSize: '11px', color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
-                                                                <LuCircleCheck size={11} /> Verified Purchase
-                                                            </span>
+                                                            {r.isVerifiedPurchase && (
+                                                                <span style={{ fontSize: '11px', color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                                                                    <LuCircleCheck size={11} /> Verified Purchase
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -854,12 +869,12 @@ export default function ProductDetailsPage() {
                                         <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', marginTop: '4px' }}>
                                             {[1,2,3,4,5].map(star => <LuStar key={star} size={13} style={{ color: '#f59e0b', fill: star <= Math.round(product.rating || 0) ? '#f59e0b' : 'none' }} />)}
                                         </div>
-                                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px' }}>{product.reviewCount || 0} ratings</div>
+                                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px' }}>{reviews.length || product.reviewCount || 0} ratings</div>
                                     </div>
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                         {[5,4,3,2,1].map(star => {
-                                            const count = product.ratingBreakdown?.[star] || 0;
-                                            const pct = Math.round((count / (product.reviewCount || 1)) * 100);
+                                            const count = reviews.filter((r: any) => r.rating === star).length;
+                                            const pct = Math.round((count / (reviews.length || 1)) * 100);
                                             return (
                                                 <div key={star} style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px' }}>
                                                     <span style={{ width: '12px', fontWeight: 600, color: '#555' }}>{star}</span>
@@ -874,7 +889,7 @@ export default function ProductDetailsPage() {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    {(product.reviews && product.reviews.length > 0) ? product.reviews.map((review: any, idx: number) => (
+                                    {reviews.length > 0 ? reviews.map((review: any, idx: number) => (
                                         <div key={idx} style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
                                             <div style={{ display: 'flex', gap: '2px', marginBottom: '5px' }}>
                                                 {[1,2,3,4,5].map(star => <LuStar key={star} size={10} style={{ color: '#f59e0b', fill: star <= (review.rating || 0) ? '#f59e0b' : 'none' }} />)}

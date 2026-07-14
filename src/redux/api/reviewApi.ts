@@ -19,7 +19,14 @@ export const reviewApi = baseApi.injectEndpoints({
                 method: 'POST',
                 body: data
             }),
-            invalidatesTags: ['Reviews']
+            // Invalidate the PRODUCT-SCOPED review list (getProductReviews is keyed by
+            // { type:'Reviews', id: productId }) so the new review + its client-computed
+            // average show immediately, plus the product itself so the header rating refreshes.
+            invalidatesTags: (result: any, error: any, arg: any) => [
+                'Reviews',
+                { type: 'Reviews' as const, id: arg?.product },
+                { type: 'Products' as const, id: arg?.product },
+            ],
         }),
         // Public: create comment (no login required) — Backend route: POST /api/reviews/public
         publicCreateReview: builder.mutation({
