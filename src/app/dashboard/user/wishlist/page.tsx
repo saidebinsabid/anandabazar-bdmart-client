@@ -75,9 +75,9 @@ export default function WishlistPage() {
                         <div key={product._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden">
                             {/* Image */}
                             <div className="relative aspect-[4/3] bg-gray-50 overflow-hidden">
-                                {product.images?.[0] ? (
+                                {(product.thumbnail || product.images?.[0]) ? (
                                     <img
-                                        src={product.images[0]}
+                                        src={product.thumbnail || product.images[0]}
                                         alt={product.name}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     />
@@ -110,9 +110,9 @@ export default function WishlistPage() {
                                 </button>
 
                                 {/* Discount Badge */}
-                                {product.discountPrice && product.discountPrice < product.price && (
+                                {product.originalPrice > product.price && (
                                     <span className="absolute top-3 left-3 px-2 py-1 bg-red-500 text-white text-[10px] font-bold rounded-md shadow-md">
-                                        -{Math.round(((product.price - product.discountPrice) / product.price) * 100)}%
+                                        -{product.discount || Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
                                     </span>
                                 )}
                             </div>
@@ -126,14 +126,14 @@ export default function WishlistPage() {
                                 </Link>
 
                                 {/* Rating */}
-                                {product.averageRating > 0 && (
+                                {product.rating > 0 && (
                                     <div className="flex items-center gap-1 mt-2">
                                         <LuStar size={12} className="text-amber-400 fill-amber-400" />
                                         <span className="text-xs font-semibold text-gray-600">
-                                            {product.averageRating?.toFixed(1)}
+                                            {product.rating?.toFixed(1)}
                                         </span>
                                         <span className="text-xs text-gray-300">
-                                            ({product.totalReviews || 0})
+                                            ({product.reviewCount || 0})
                                         </span>
                                     </div>
                                 )}
@@ -141,11 +141,11 @@ export default function WishlistPage() {
                                 {/* Price */}
                                 <div className="flex items-center gap-2 mt-3">
                                     <span className="text-lg font-bold text-[var(--color-primary)]">
-                                        ৳{(product.discountPrice || product.price)?.toLocaleString()}
+                                        ৳{product.price?.toLocaleString()}
                                     </span>
-                                    {product.discountPrice && product.discountPrice < product.price && (
+                                    {product.originalPrice > product.price && (
                                         <span className="text-xs text-gray-400 line-through">
-                                            ৳{product.price?.toLocaleString()}
+                                            ৳{product.originalPrice?.toLocaleString()}
                                         </span>
                                     )}
                                 </div>

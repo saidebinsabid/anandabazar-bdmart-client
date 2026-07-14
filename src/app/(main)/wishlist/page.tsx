@@ -18,17 +18,19 @@ import { useGetWishlistQuery } from '@/redux/api/userApi';
  * add-to-cart for both auth + guest states, so each card gets remove + add-to-cart.
  */
 
-// Server product shape → NewProductCard props
+// Server product shape → NewProductCard props (uses the real Product field names)
 const mapServerProduct = (p: any) => ({
     id: String(p._id),
     slug: p.slug,
     name: p.name,
-    image: p.images?.[0] || '',
-    price: p.discountPrice && p.discountPrice < p.price ? p.discountPrice : p.price,
-    originalPrice: p.discountPrice && p.discountPrice < p.price ? p.price : undefined,
-    rating: p.averageRating || 0,
-    reviews: p.totalReviews || 0,
-    reviewCount: p.totalReviews || 0,
+    image: p.thumbnail || p.images?.[0] || '',
+    price: p.price,
+    originalPrice: p.originalPrice && p.originalPrice > p.price ? p.originalPrice : undefined,
+    mrp: p.originalPrice || p.price,
+    discount: p.discount,
+    rating: p.rating || 0,
+    reviews: p.reviewCount || 0,
+    reviewCount: p.reviewCount || 0,
     categoryName: '',
 });
 
