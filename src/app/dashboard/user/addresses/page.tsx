@@ -21,13 +21,13 @@ interface Address {
     address: string;
     city: string;
     area: string;
-    zipCode: string;
+    postalCode: string;
     isDefault?: boolean;
     label?: string;
 }
 
 const emptyAddress = {
-    fullName: '', phone: '', address: '', city: '', area: '', zipCode: '', label: 'Home',
+    fullName: '', phone: '', address: '', city: '', area: '', postalCode: '', label: 'Home', isDefault: false,
 };
 
 export default function AddressesPage() {
@@ -56,8 +56,9 @@ export default function AddressesPage() {
             address: addr.address,
             city: addr.city,
             area: addr.area,
-            zipCode: addr.zipCode,
+            postalCode: addr.postalCode,
             label: addr.label || 'Home',
+            isDefault: !!addr.isDefault,
         });
         setShowModal(true);
     };
@@ -166,7 +167,7 @@ export default function AddressesPage() {
                             <p className="text-sm font-bold text-gray-800 mb-1">{addr.fullName}</p>
                             <p className="text-sm text-gray-500">{addr.address}</p>
                             <p className="text-sm text-gray-500">{addr.city}, {addr.area}</p>
-                            <p className="text-sm text-gray-500">Zip: {addr.zipCode}</p>
+                            <p className="text-sm text-gray-500">Zip: {addr.postalCode}</p>
                             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-50 text-xs text-gray-400">
                                 <LuPhone size={12} />
                                 <span>{addr.phone}</span>
@@ -240,10 +241,22 @@ export default function AddressesPage() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 mb-2">Zip Code</label>
-                                    <input type="text" required value={form.zipCode} onChange={(e) => setForm({ ...form, zipCode: e.target.value })}
+                                    <input type="text" required value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
                                         className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[var(--color-primary)] outline-none text-sm transition-all" placeholder="1200" />
                                 </div>
                             </div>
+
+                            {/* Set as default */}
+                            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={form.isDefault}
+                                    onChange={(e) => setForm({ ...form, isDefault: e.target.checked })}
+                                    className="w-4 h-4 rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)]/30 accent-[var(--color-primary)]"
+                                />
+                                <span className="text-sm font-medium text-gray-600">Set as default shipping address</span>
+                            </label>
+
                             <div className="flex justify-end gap-3 pt-3">
                                 <button type="button" onClick={() => setShowModal(false)}
                                     className="px-5 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
