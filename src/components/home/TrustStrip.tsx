@@ -31,10 +31,12 @@ const items = [
 ];
 
 /**
- * Trust strip — three compact, centred cards (Safe Payment | Fast Delivery |
- * Free Return): icon badge on top, then title, then supporting line. On hover
- * or touch, a brand-orange border draws in from the top-left and bottom-right
- * corners and meets in the middle (see `.card-draw` in globals.css).
+ * Trust strip — three wide cards (Safe Payment | Fast Delivery | Free Return).
+ * Each card fills its column and lays the icon badge beside the title +
+ * supporting line, giving a landscape card. On the narrow 3-up mobile grid
+ * there is no room for that, so the icon stacks above centred text instead.
+ * On hover or touch, a brand-orange border draws in from the top-left and
+ * bottom-right corners and meets in the middle (see `.card-draw` in globals.css).
  */
 const TrustStrip: React.FC = () => {
     return (
@@ -44,22 +46,23 @@ const TrustStrip: React.FC = () => {
                     <div
                         key={label}
                         tabIndex={0}
-                        className="card-draw group relative mx-auto flex w-full max-w-[230px] flex-col items-center gap-2 sm:gap-2.5 rounded-xl border border-slate-200 bg-white px-2.5 py-4 sm:px-4 sm:py-6 text-center shadow-sm outline-none transition-shadow duration-300 hover:shadow-md"
+                        className="card-draw group relative flex w-full flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-4 text-center shadow-sm outline-none transition-shadow duration-300 hover:shadow-md sm:flex-row sm:items-center sm:gap-3.5 sm:px-5 sm:py-4 sm:text-left"
                     >
-                        {/* Icon on top */}
+                        {/* Icon — stacked on top on mobile, beside the text from sm: up */}
                         <div
                             className={`flex-shrink-0 flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full ${iconBg} ring-4 ring-transparent ${ring} transition-all duration-300`}
                         >
                             <Icon className={`${iconColor} w-4 h-4 sm:w-[22px] sm:h-[22px]`} />
                         </div>
-                        {/* Title */}
-                        <p className="text-[11px] sm:text-sm font-semibold text-slate-800 leading-tight">
-                            {label}
-                        </p>
-                        {/* Description */}
-                        <p className="hidden sm:block text-xs text-slate-500 leading-snug">
-                            {sub}
-                        </p>
+                        {/* Text block — sits to the right of the icon on wider screens */}
+                        <div className="min-w-0">
+                            <p className="text-[11px] sm:text-sm font-semibold text-slate-800 leading-tight">
+                                {label}
+                            </p>
+                            <p className="hidden sm:block text-xs text-slate-500 leading-snug mt-0.5">
+                                {sub}
+                            </p>
+                        </div>
                     </div>
                 ))}
             </div>
