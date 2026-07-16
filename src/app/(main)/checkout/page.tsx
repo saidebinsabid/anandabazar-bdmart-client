@@ -6,8 +6,7 @@ import { useAppDispatch, useAppSelector } from '@/redux';
 import { removeFromCart } from '@/redux/slices/cartSlice';
 import { loginSuccess } from '@/redux/slices/authSlice';
 import { useCreateOrderMutation, useGuestCheckoutMutation } from '@/redux/api/orderApi';
-import { useInitPaymentMutation } from '@/redux/api/paymentApi';
-import { useGetSiteContentQuery } from '@/redux/api/siteContentApi';
+import { useInitPaymentMutation, useGetPaymentMethodsQuery } from '@/redux/api/paymentApi';
 import { useGetShippingQuoteQuery } from '@/redux/api/shippingApi';
 import { useGetMyAddressesQuery, useAddAddressMutation } from '@/redux/api/userApi';
 import {
@@ -21,45 +20,36 @@ import {
     couponDiscountTotal, couponHasFreeShipping,
 } from '@/lib/coupons';
 
-// ─── Payment methods offered: bKash + SSLCommerz + Cash on Delivery ──────────
-// (bKash account number/instructions come dynamically from site settings)
-const PAYMENT_META = [
-    {
-        id: 'bkash',
-        label: 'bKash',
-        sub: 'Send Money to our bKash number',
-        color: '#E2136E',
-        kind: 'mobile' as const,
-    },
-    {
-        id: 'nagad',
-        label: 'Nagad',
-        sub: 'Pay securely with Nagad',
-        color: '#EC1C24',
-        kind: 'gateway' as const,
-    },
-    {
-        id: 'rocket',
-        label: 'Rocket',
-        sub: 'Pay securely with Rocket (DBBL)',
-        color: '#8C3494',
-        kind: 'gateway' as const,
-    },
-    {
-        id: 'sslcommerz',
-        label: 'Cards & Mobile Banking (SSLCommerz)',
-        sub: 'Visa, Mastercard, Nagad, Rocket & more',
-        color: '#1F6FEB',
-        kind: 'gateway' as const,
-    },
-    {
-        id: 'cod',
-        label: 'Cash on Delivery',
-        sub: 'Pay in cash when your order arrives',
-        color: '#16a34a',
-        kind: 'cod' as const,
-    },
-];
+/**
+ * Branding only. WHICH methods appear and HOW each one takes money is decided
+ * by the server (GET /payments/methods), never guessed here — that guess is what
+ * used to make bKash ask for a Send Money receipt *and* bounce to a gateway.
+ */
+type PayMode = 'gateway' | 'manual' | 'cod';
+interface PayMethod {
+    id: string;
+    label: string;
+    mode: PayMode;
+    live: boolean;
+    number?: string;
+    accountType?: string;
+}
+
+const BRAND: Record<string, { name: string; color: string; short: string }> = {
+    bkash:      { name: 'bKash',            color: '#E2136E', short: 'bK' },
+    nagad:      { name: 'Nagad',            color: '#EC1C24', short: 'N' },
+    rocket:     { name: 'Rocket',           color: '#8C3494', short: 'R' },
+    sslcommerz: { name: 'Cards & Banking',  color: '#1F6FEB', short: '' },
+    cod:        { name: 'Cash on Delivery', color: '#16a34a', short: '' },
+};
+
+const SUBLINE: Record<PayMode, (m: PayMethod) => string> = {
+    gateway: (m) => (m.id === 'sslcommerz'
+        ? 'Visa, Mastercard, bKash, Nagad, Rocket & more'
+        : `Pay securely with ${BRAND[m.id]?.name || m.label}`),
+    manual: (m) => `Send Money to our ${BRAND[m.id]?.name || m.label} number`,
+    cod: () => 'Pay in cash when your order arrives',
+};
 
 const inputClass =
     "w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded text-sm text-gray-800 outline-none focus:border-[var(--color-primary)] transition-colors placeholder:text-gray-400";
@@ -87,18 +77,11 @@ const CheckoutPage = () => {
     const [createOrder, { isLoading: isPlacingOrder }] = useCreateOrderMutation();
     const [guestCheckout, { isLoading: isGuestPlacing }] = useGuestCheckoutMutation();
     const [initPayment, { isLoading: isInitiatingPayment }] = useInitPaymentMutation();
-    const { data: siteRes } = useGetSiteContentQuery({});
 
-    const paymentCfg = siteRes?.data?.payment || {};
-    const methods = PAYMENT_META
-        .map(m => ({
-            ...m,
-            number: m.kind === 'mobile' ? (paymentCfg[m.id]?.number || '') : '',
-            accountType: m.kind === 'mobile' ? (paymentCfg[m.id]?.accountType || 'Personal') : '',
-            active: paymentCfg[m.id]?.active !== false,
-        }))
-        .filter(m => m.active);
-    const paymentInstructions = paymentCfg.instructions || '';
+    // The server decides what may be offered and how each method collects money.
+    const { data: methodsRes, isLoading: isLoadingMethods } = useGetPaymentMethodsQuery(undefined);
+    const methods: PayMethod[] = methodsRes?.data?.methods || [];
+    const paymentInstructions: string = methodsRes?.data?.instructions || '';
     const availableIds = methods.map(m => m.id).join(',');
 
     const [formData, setFormData] = useState({
@@ -220,9 +203,10 @@ const CheckoutPage = () => {
         if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) e.email = 'Enter a valid email';
         if (!formData.address.trim()) e.address = 'Address is required';
         if (!formData.city.trim()) e.city = 'City is required';
-        // bKash requires the "send money" confirmation details. SSLCommerz redirects
-        // to the gateway (later phase) and COD is paid on delivery — neither needs them.
-        if (selectedPayment === 'bkash') {
+        // Only a manual "Send Money" method needs receipt details. A gateway
+        // collects the money itself and COD is paid on delivery — asking either
+        // for a transaction id is what made the old flow contradictory.
+        if (methods.find(m => m.id === selectedPayment)?.mode === 'manual') {
             if (!paymentDetails.senderNumber.trim()) e.senderNumber = 'Sender number is required';
             if (!paymentDetails.transactionId.trim()) e.transactionId = 'Transaction ID is required';
             if (!paymentDetails.paymentTime.trim()) e.paymentTime = 'Payment time is required';
@@ -230,8 +214,11 @@ const CheckoutPage = () => {
         return e;
     };
 
-    const activeMethod = methods.find(m => m.id === selectedPayment) || methods[0]
-        || { ...PAYMENT_META[0], number: '', accountType: 'Personal', active: true };
+    const activeMethod: PayMethod | undefined = methods.find(m => m.id === selectedPayment) || methods[0];
+    const activeBrand = BRAND[activeMethod?.id || ''] || { name: activeMethod?.label || '', color: '#64748b', short: '' };
+    // Exactly one behaviour per method — never a manual receipt *and* a redirect.
+    const isGatewayMethod = activeMethod?.mode === 'gateway';
+    const isManualMethod = activeMethod?.mode === 'manual';
 
     const copyNumber = () => {
         if (!activeMethod?.number) return;
@@ -298,8 +285,8 @@ const CheckoutPage = () => {
                 postalCode: formData.postalCode,
             },
             paymentMethod: selectedPayment,
-            // Only bKash carries the manual send-money confirmation details.
-            paymentDetails: selectedPayment === 'bkash' ? {
+            // Receipt details exist only for a manual send-money method.
+            paymentDetails: isManualMethod ? {
                 senderNumber: paymentDetails.senderNumber,
                 transactionId: paymentDetails.transactionId,
                 paymentTime: paymentDetails.paymentTime,
@@ -310,10 +297,9 @@ const CheckoutPage = () => {
                 : {}),
         };
 
-        // Every online gateway (bKash / Nagad / Rocket / SSLCommerz) hands the
-        // browser off to the gateway after the order is created. COD never
-        // touches the gateway and simply lands on the success page like before.
-        const isGatewayMethod = selectedPayment !== 'cod';
+        // Only a gateway method hands the browser off after the order is created.
+        // Manual send-money and COD both land straight on the success page — the
+        // customer has already paid (or will pay the rider).
 
         // Initialise the gateway for the freshly-created order and redirect the
         // browser to whatever URL the backend returns (real gateway in prod, the
@@ -611,22 +597,46 @@ const CheckoutPage = () => {
                             </div>
 
                             {/* ── Payment Method ── */}
-                            <div className="bg-white rounded-lg border border-gray-200">
-                                <div className="px-5 py-3.5 border-b border-gray-100">
-                                    <h2 className="text-sm font-semibold text-gray-900">Payment Method</h2>
+                            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="w-8 h-8 rounded-lg bg-[var(--color-primary)]/10 flex items-center justify-center">
+                                            <LuCreditCard size={15} className="text-[var(--color-primary)]" />
+                                        </span>
+                                        <div>
+                                            <h2 className="text-sm font-bold text-gray-900 leading-tight">Payment Method</h2>
+                                            <p className="text-[11px] text-gray-400">Choose how you&apos;d like to pay</p>
+                                        </div>
+                                    </div>
+                                    <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                                        <LuLock size={11} /> Secure
+                                    </span>
                                 </div>
                                 <div className="px-5 py-5 space-y-3">
 
-                                    {/* Selectable option rows */}
+                                    {isLoadingMethods && (
+                                        <div className="space-y-2.5">
+                                            {[...Array(3)].map((_, i) => (
+                                                <div key={i} className="h-[68px] rounded-xl bg-gray-50 animate-pulse" />
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Selectable method cards */}
                                     {methods.map((method) => {
                                         const active = selectedPayment === method.id;
+                                        const brand = BRAND[method.id] || { name: method.label, color: '#64748b', short: '' };
                                         return (
                                             <label
                                                 key={method.id}
-                                                className={`flex items-center gap-3 px-4 py-3.5 rounded-lg border cursor-pointer transition-colors ${
-                                                    active ? 'bg-orange-50/40' : 'border-gray-200 hover:border-gray-300'
+                                                className={`group relative flex items-center gap-3.5 px-4 py-3.5 rounded-xl border cursor-pointer transition-all duration-200 ${
+                                                    active
+                                                        ? 'shadow-[0_2px_12px_-4px_rgba(0,0,0,0.18)]'
+                                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/60'
                                                 }`}
-                                                style={active ? { borderColor: method.color } : {}}
+                                                style={active
+                                                    ? { borderColor: brand.color, background: `${brand.color}0A`, boxShadow: `0 0 0 1px ${brand.color}` }
+                                                    : {}}
                                             >
                                                 <input
                                                     type="radio"
@@ -636,31 +646,58 @@ const CheckoutPage = () => {
                                                     onChange={() => setSelectedPayment(method.id)}
                                                     className="sr-only"
                                                 />
-                                                {/* Radio dot */}
+                                                {/* Brand tile */}
                                                 <span
-                                                    className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                                                    style={{ borderColor: active ? method.color : '#d1d5db' }}
+                                                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-[13px] font-extrabold shadow-sm transition-transform duration-200 group-hover:scale-105"
+                                                    style={{ background: brand.color }}
                                                 >
-                                                    {active && <span className="w-2 h-2 rounded-full" style={{ background: method.color }} />}
-                                                </span>
-                                                {/* Icon badge */}
-                                                <span
-                                                    className="w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
-                                                    style={{ background: method.color }}
-                                                >
-                                                    {method.kind === 'cod'
-                                                        ? <LuTruck size={16} />
-                                                        : method.kind === 'gateway'
-                                                            ? <LuCreditCard size={16} />
-                                                            : 'b'}
+                                                    {method.mode === 'cod'
+                                                        ? <LuTruck size={18} />
+                                                        : method.id === 'sslcommerz'
+                                                            ? <LuCreditCard size={18} />
+                                                            : brand.short}
                                                 </span>
                                                 <span className="flex-1 min-w-0">
-                                                    <span className="block text-sm font-medium text-gray-900 truncate">{method.label}</span>
-                                                    <span className="block text-xs text-gray-400 mt-0.5 truncate">{method.sub}</span>
+                                                    <span className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-sm font-bold text-gray-900">{brand.name}</span>
+                                                        {/* How this method actually takes the money */}
+                                                        {method.mode === 'gateway' && method.live && (
+                                                            <span className="inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">
+                                                                <LuLock size={8} /> Secure gateway
+                                                            </span>
+                                                        )}
+                                                        {method.mode === 'gateway' && !method.live && (
+                                                            <span className="inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                                                                Demo preview
+                                                            </span>
+                                                        )}
+                                                        {method.mode === 'manual' && (
+                                                            <span className="inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wide text-gray-600 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">
+                                                                Send Money
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                    <span className="block text-xs text-gray-400 mt-0.5 truncate">{SUBLINE[method.mode](method)}</span>
+                                                </span>
+                                                {/* Selected tick */}
+                                                <span
+                                                    className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors"
+                                                    style={active
+                                                        ? { borderColor: brand.color, background: brand.color }
+                                                        : { borderColor: '#d1d5db' }}
+                                                >
+                                                    {active && <LuCheck size={11} className="text-white" strokeWidth={3.5} />}
                                                 </span>
                                             </label>
                                         );
                                     })}
+
+                                    {!isLoadingMethods && methods.length === 0 && (
+                                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-center">
+                                            <p className="text-sm font-semibold text-amber-800">No payment method is available right now</p>
+                                            <p className="text-xs text-amber-700 mt-0.5">Please contact us to complete your order.</p>
+                                        </div>
+                                    )}
 
                                     {/* ── Method-specific details ── */}
                                     {selectedPayment === 'cod' && (
@@ -677,65 +714,92 @@ const CheckoutPage = () => {
                                         </div>
                                     )}
 
-                                    {selectedPayment === 'sslcommerz' && (
-                                        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-4 flex items-start gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                                <LuCreditCard size={15} className="text-blue-600" />
+                                    {/* GATEWAY — the provider collects the money, so we never ask
+                                        for a receipt here. Only the redirect is explained. */}
+                                    {isGatewayMethod && activeMethod && (
+                                        <div className="rounded-xl border px-4 py-4"
+                                            style={{ borderColor: `${activeBrand.color}33`, background: `${activeBrand.color}0A` }}>
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                                                    style={{ background: `${activeBrand.color}1A` }}>
+                                                    <LuLock size={15} style={{ color: activeBrand.color }} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-gray-900">
+                                                        You&apos;ll finish payment on {activeBrand.name}
+                                                    </p>
+                                                    <p className="text-xs text-gray-600 mt-0.5 leading-relaxed">
+                                                        Place the order and we&apos;ll take you to the secure {activeBrand.name} page. Your
+                                                        card or wallet details are entered there — they never touch this site.
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-blue-800">Secure online payment</p>
-                                                <p className="text-xs text-blue-700 mt-0.5 leading-relaxed">
-                                                    You will be redirected to SSLCommerz to complete payment using your card, internet banking, or mobile wallet.
+                                            {/* Honest about the sandbox: no merchant account is connected yet. */}
+                                            {!activeMethod.live && (
+                                                <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+                                                    <LuInfo size={12} className="mt-0.5 flex-shrink-0" />
+                                                    <span>
+                                                        <strong>Demo preview</strong> — a merchant account isn&apos;t connected yet, so the next
+                                                        screen is a sandbox that mirrors the real flow. No money is taken.
+                                                    </span>
                                                 </p>
-                                            </div>
+                                            )}
                                         </div>
                                     )}
 
-                                    {selectedPayment === 'bkash' && (
-                                        <div className="pt-1">
-                                            {/* Merchant number */}
-                                            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-xs text-gray-500">
-                                                        Send Money ({activeMethod.accountType}) to this {activeMethod.label} number
-                                                    </p>
-                                                    {activeMethod.number ? (
-                                                        <p className="text-base font-semibold tracking-wide text-gray-900 mt-0.5">{activeMethod.number}</p>
-                                                    ) : (
-                                                        <p className="text-sm font-medium text-amber-600 mt-0.5">Number not set — please contact support</p>
-                                                    )}
-                                                </div>
-                                                {activeMethod.number && (
+                                    {/* MANUAL — the shop published a wallet number. The customer sends
+                                        money themselves, so the receipt details ARE the payment proof. */}
+                                    {isManualMethod && activeMethod && (
+                                        <div className="pt-1 space-y-4">
+                                            {/* Step 1 — the number to send to */}
+                                            <div className="rounded-xl border-2 border-dashed px-4 py-4"
+                                                style={{ borderColor: `${activeBrand.color}59`, background: `${activeBrand.color}08` }}>
+                                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                                    <div className="min-w-0">
+                                                        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: activeBrand.color }}>
+                                                            <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: activeBrand.color }}>1</span>
+                                                            Send Money ({activeMethod.accountType}) to
+                                                        </p>
+                                                        <p className="text-xl font-extrabold tracking-wider text-gray-900 mt-1 tabular-nums">
+                                                            {activeMethod.number}
+                                                        </p>
+                                                    </div>
                                                     <button
                                                         type="button"
                                                         onClick={copyNumber}
-                                                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
+                                                        className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-lg text-white transition-opacity hover:opacity-90"
+                                                        style={{ background: activeBrand.color }}
                                                     >
                                                         {copied ? <><LuCheck size={13} /> Copied</> : <><LuCopy size={13} /> Copy</>}
                                                     </button>
-                                                )}
+                                                </div>
+                                                <p className="mt-2.5 text-xs text-gray-600 leading-relaxed">
+                                                    {paymentInstructions || `Open your ${activeBrand.name} app, Send Money to the number above, then fill in the details below.`}
+                                                </p>
                                             </div>
 
-                                            {paymentInstructions && (
-                                                <p className="mt-3 text-xs text-gray-500 leading-relaxed">{paymentInstructions}</p>
-                                            )}
-
-                                            {/* Payment details form */}
-                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="md:col-span-2">
-                                                    <label className={labelClass}>Your {activeMethod.label} Number <span className="text-red-500">*</span></label>
-                                                    <input type="tel" name="senderNumber" value={paymentDetails.senderNumber} onChange={handlePaymentDetailChange} placeholder="Number you sent money from" className={cls('senderNumber')} />
-                                                    <FieldError field="senderNumber" />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Transaction ID <span className="text-red-500">*</span></label>
-                                                    <input type="text" name="transactionId" value={paymentDetails.transactionId} onChange={handlePaymentDetailChange} placeholder="e.g. 9A1B2C3D4E" className={cls('transactionId')} />
-                                                    <FieldError field="transactionId" />
-                                                </div>
-                                                <div>
-                                                    <label className={labelClass}>Payment Time <span className="text-red-500">*</span></label>
-                                                    <input type="datetime-local" name="paymentTime" value={paymentDetails.paymentTime} onChange={handlePaymentDetailChange} className={cls('paymentTime')} />
-                                                    <FieldError field="paymentTime" />
+                                            {/* Step 2 — the receipt */}
+                                            <div>
+                                                <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-3">
+                                                    <span className="w-4 h-4 rounded-full text-white text-[9px] flex items-center justify-center" style={{ background: activeBrand.color }}>2</span>
+                                                    Confirm your payment
+                                                </p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="md:col-span-2">
+                                                        <label className={labelClass}>Your {activeBrand.name} Number <span className="text-red-500">*</span></label>
+                                                        <input type="tel" name="senderNumber" value={paymentDetails.senderNumber} onChange={handlePaymentDetailChange} placeholder="Number you sent money from" className={cls('senderNumber')} />
+                                                        <FieldError field="senderNumber" />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelClass}>Transaction ID <span className="text-red-500">*</span></label>
+                                                        <input type="text" name="transactionId" value={paymentDetails.transactionId} onChange={handlePaymentDetailChange} placeholder="e.g. 9A1B2C3D4E" className={cls('transactionId')} />
+                                                        <FieldError field="transactionId" />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelClass}>Payment Time <span className="text-red-500">*</span></label>
+                                                        <input type="datetime-local" name="paymentTime" value={paymentDetails.paymentTime} onChange={handlePaymentDetailChange} className={cls('paymentTime')} />
+                                                        <FieldError field="paymentTime" />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -801,7 +865,7 @@ const CheckoutPage = () => {
                                     <p className="text-xs text-gray-400">
                                         {selectedPayment === 'cod'
                                             ? <><span className="font-medium text-green-600">Cash on Delivery</span> — pay when delivered</>
-                                            : <>Paying via <span className="font-medium" style={{ color: activeMethod.color }}>{activeMethod.label}</span></>
+                                            : <>Paying via <span className="font-medium" style={{ color: activeBrand.color }}>{activeBrand.name}</span></>
                                         }
                                     </p>
                                 </div>

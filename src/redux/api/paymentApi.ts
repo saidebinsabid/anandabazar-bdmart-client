@@ -3,6 +3,16 @@ import { baseApi } from "./baseApi";
 export const paymentApi = baseApi.injectEndpoints({
     endpoints: (builder) => ({
         // ===== Customer / gateway endpoints =====
+        // What checkout may offer + how each method collects money —
+        // Backend route: GET /api/payments/methods
+        // data: { methods: [{ id, label, mode: 'gateway'|'manual'|'cod', live, number?, accountType? }], instructions }
+        getPaymentMethods: builder.query({
+            query: () => ({
+                url: '/payments/methods',
+                method: 'GET',
+            }),
+            providesTags: ['Payments'],
+        }),
         // Init a payment for an order — Backend route: POST /api/payments/init
         // Body: { orderId, method }  →  data: { redirectUrl, transactionId }
         initPayment: builder.mutation({
@@ -71,6 +81,7 @@ export const paymentApi = baseApi.injectEndpoints({
 
 export const {
     // Customer / gateway hooks
+    useGetPaymentMethodsQuery,
     useInitPaymentMutation,
     useVerifyPaymentQuery,
     useGetMyPaymentsQuery,
