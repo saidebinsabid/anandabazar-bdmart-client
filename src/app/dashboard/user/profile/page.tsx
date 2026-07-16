@@ -220,22 +220,25 @@ export default function ProfilePage() {
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><LuCircleCheck size={13} /> Active</span>
                 </div>
 
-                {/* Google (placeholder — needs OAuth setup) */}
-                <div className="flex items-center justify-between py-3 px-4 rounded-xl border border-gray-100 mt-3">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center"><FcGoogle size={18} /></div>
-                        <div>
-                            <p className="text-sm font-semibold text-gray-800">Google</p>
-                            <p className="text-xs text-gray-400">Sign in faster with your Gmail</p>
+                {/* Google — only shown once Google sign-in is configured (same gate as the
+                    login/register buttons). Linking needs no action: signing in with
+                    Google using this same address attaches it to this account. */}
+                {!!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+                    <div className="flex items-center justify-between py-3 px-4 rounded-xl border border-gray-100 mt-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center"><FcGoogle size={18} /></div>
+                            <div className="min-w-0">
+                                <p className="text-sm font-semibold text-gray-800">Google</p>
+                                <p className="text-xs text-gray-400 truncate">
+                                    Use &ldquo;Continue with Google&rdquo; with {user?.email} to sign in faster
+                                </p>
+                            </div>
                         </div>
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 flex-shrink-0">
+                            Links automatically
+                        </span>
                     </div>
-                    <button
-                        onClick={() => toast('Google sign-in is coming soon — setup in progress.', { icon: '🔧' })}
-                        className="text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:border-gray-300 transition-all"
-                    >
-                        Connect
-                    </button>
-                </div>
+                )}
 
                 {/* Change password */}
                 <div className="mt-5">
