@@ -231,7 +231,10 @@ export default function OrderDetailsPage() {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-12 h-12 rounded-md bg-gray-50 overflow-hidden border border-gray-100 p-1">
-                                                        <img src={item.product?.thumbnail || item.image} alt={item.name} className="w-full h-full object-cover rounded-sm" />
+                                                        {/* Prefer the snapshot taken at purchase time — it is what the
+                                                            customer actually bought, and it survives the product being
+                                                            edited or deleted later. */}
+                                                        <img src={item.thumbnail || item.product?.thumbnail || ''} alt={item.name} className="w-full h-full object-cover rounded-sm" />
                                                     </div>
                                                     <div>
                                                         <p className="text-sm font-bold text-gray-800">{item.name}</p>
