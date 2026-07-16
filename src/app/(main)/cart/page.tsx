@@ -11,8 +11,12 @@ import { toast } from 'react-hot-toast';
 import { useValidateCouponMutation } from '@/redux/api/couponApi';
 import { useGetShippingQuoteQuery, useGetShippingSettingsQuery } from '@/redux/api/shippingApi';
 import { useGetProductByIdQuery } from '@/redux/api/productApi';
+import {
+    type AppliedCoupon,
+    loadAppliedCoupons, saveAppliedCoupons,
+    couponDiscountTotal, couponHasFreeShipping,
+} from '@/lib/coupons';
 
-const COUPON_STORAGE_KEY = 'anandabazarbdmart_applied_coupon';
 const SELECTED_STORAGE_KEY = 'anandabazarbdmart_selected_cart';
 
 // Resolve common colour names to a CSS hex so the swatch dot always renders.
@@ -216,7 +220,8 @@ const CartPage = () => {
     const dispatch = useAppDispatch();
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
     const [couponCode, setCouponCode] = useState('');
-    const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; finalAmount: number; message: string; freeShipping?: boolean } | null>(null);
+    // Multiple coupons can be stacked on one order (percentage / fixed / free-shipping).
+    const [appliedCoupons, setAppliedCoupons] = useState<AppliedCoupon[]>([]);
     const [couponError, setCouponError] = useState('');
     const [validateCoupon, { isLoading: isValidating }] = useValidateCouponMutation();
 
@@ -262,16 +267,9 @@ const CartPage = () => {
         try { localStorage.setItem(SELECTED_STORAGE_KEY, JSON.stringify(selectedIds)); } catch {}
     };
 
-    // Restore saved coupon on mount
+    // Restore saved coupons on mount
     useEffect(() => {
-        try {
-            const saved = localStorage.getItem(COUPON_STORAGE_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                setAppliedCoupon(parsed);
-                setCouponCode(parsed.code);
-            }
-        } catch {}
+        setAppliedCoupons(loadAppliedCoupons());
     }, []);
 
     // Hydrate the saved-for-later list from localStorage on mount
@@ -293,22 +291,37 @@ const CartPage = () => {
         toast.success('Moved to cart');
     };
 
+    const persistCoupons = (list: AppliedCoupon[]) => {
+        setAppliedCoupons(list);
+        saveAppliedCoupons(list);
+    };
+
     const handleApplyCoupon = async () => {
         const code = couponCode.trim().toUpperCase();
         if (!code) return;
         setCouponError('');
+        // Guard: don't add the same coupon twice.
+        if (appliedCoupons.some((c) => c.code === code)) {
+            setCouponError('This coupon is already applied');
+            return;
+        }
         try {
             const items = selectedItems.map((i: any) => ({ product: i.productId, price: i.price, quantity: i.quantity }));
             const result = await validateCoupon({ code, orderAmount: selectedSubtotal, items }).unwrap();
-            const couponData = {
+            const freeShipping = Boolean(result.data?.freeShipping ?? result.freeShipping);
+            // Guard: only one free-shipping coupon is meaningful per order.
+            if (freeShipping && couponHasFreeShipping(appliedCoupons)) {
+                setCouponError('A free-shipping coupon is already applied');
+                return;
+            }
+            const couponData: AppliedCoupon = {
                 code,
                 discount: result.data?.discount ?? result.discount ?? 0,
-                finalAmount: result.data?.finalAmount ?? result.finalAmount ?? (selectedSubtotal - (result.data?.discount ?? result.discount ?? 0)),
                 message: result.data?.message ?? result.message ?? 'Coupon applied!',
-                freeShipping: Boolean(result.data?.freeShipping ?? result.freeShipping),
+                freeShipping,
             };
-            setAppliedCoupon(couponData);
-            localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(couponData));
+            persistCoupons([...appliedCoupons, couponData]);
+            setCouponCode('');
             toast.success('Coupon applied successfully!');
         } catch (err: any) {
             const msg = err?.data?.message || 'Invalid or expired coupon code';
@@ -317,11 +330,9 @@ const CartPage = () => {
         }
     };
 
-    const handleRemoveCoupon = () => {
-        setAppliedCoupon(null);
-        setCouponCode('');
+    const handleRemoveCoupon = (code: string) => {
+        persistCoupons(appliedCoupons.filter((c) => c.code !== code));
         setCouponError('');
-        localStorage.removeItem(COUPON_STORAGE_KEY);
     };
 
     // ─── Estimated shipping (no city yet → backend returns the default flat rate) ──
@@ -329,7 +340,8 @@ const CartPage = () => {
         { subtotal: selectedSubtotal },
         { skip: selectedSubtotal <= 0 },
     );
-    const couponFreeShipping = Boolean(appliedCoupon?.freeShipping);
+    const couponFreeShipping = couponHasFreeShipping(appliedCoupons);
+    const couponDiscount = couponDiscountTotal(appliedCoupons);
     const freeShipping = couponFreeShipping || (shippingQuote?.freeShipping ?? (selectedSubtotal >= 5000));
     const shippingCost = freeShipping ? 0 : (shippingQuote?.shippingCost ?? (selectedSubtotal >= 5000 ? 0 : 120));
 
@@ -338,9 +350,14 @@ const CartPage = () => {
     const freeThreshold = shipSettings?.freeShippingByThresholdEnabled ? (shipSettings?.freeShippingThreshold || 0) : 0;
     const remainingForFree = freeThreshold > 0 && !freeShipping ? Math.max(0, freeThreshold - selectedSubtotal) : 0;
 
-    // Total = (subtotal − coupon discount) + estimated shipping
-    const baseAmount = selectedSubtotal - (appliedCoupon?.discount ?? 0);
+    // Total = (subtotal − total coupon discount, floored at 0) + estimated shipping
+    const baseAmount = Math.max(0, selectedSubtotal - couponDiscount);
     const finalTotal = baseAmount + shippingCost;
+    // What the order would cost with no coupons — shown struck-through when any coupon applies.
+    const originalShipping = couponFreeShipping
+        ? (shippingQuote?.shippingCost ?? (selectedSubtotal >= 5000 ? 0 : 120))
+        : shippingCost;
+    const preDiscountTotal = selectedSubtotal + originalShipping;
 
     const handleClearCart = () => {
         if (window.confirm('Are you sure you want to clear your cart?')) {
@@ -617,35 +634,43 @@ const CartPage = () => {
                                             type="text"
                                             value={couponCode}
                                             onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponError(''); }}
-                                            onKeyDown={e => e.key === 'Enter' && !appliedCoupon && handleApplyCoupon()}
+                                            onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
                                             placeholder="Enter coupon code"
-                                            disabled={!!appliedCoupon}
-                                            className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-200 rounded outline-none focus:border-[var(--color-primary)] bg-white disabled:bg-gray-100 disabled:text-gray-500 uppercase placeholder:normal-case placeholder:text-gray-400"
+                                            className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-200 rounded outline-none focus:border-[var(--color-primary)] bg-white uppercase placeholder:normal-case placeholder:text-gray-400"
                                         />
-                                        {appliedCoupon ? (
-                                            <button
-                                                onClick={handleRemoveCoupon}
-                                                className="px-3 py-2 text-xs font-semibold text-red-500 border border-red-200 rounded hover:bg-red-50 transition-colors flex items-center gap-1 flex-shrink-0"
-                                            >
-                                                <LuX size={12} /> Remove
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={handleApplyCoupon}
-                                                disabled={isValidating || !couponCode.trim()}
-                                                className="px-4 py-2 text-xs font-semibold bg-[var(--color-primary)] text-white rounded hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                                            >
-                                                {isValidating ? '...' : 'Apply'}
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={handleApplyCoupon}
+                                            disabled={isValidating || !couponCode.trim()}
+                                            className="px-4 py-2 text-xs font-semibold bg-[var(--color-primary)] text-white rounded hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                                        >
+                                            {isValidating ? '...' : 'Apply'}
+                                        </button>
                                     </div>
                                     {couponError && (
                                         <p className="mt-1.5 text-xs text-red-500">{couponError}</p>
                                     )}
-                                    {appliedCoupon && (
-                                        <p className="mt-1.5 text-xs text-green-600 font-medium flex items-center gap-1">
-                                            <LuCheck size={11} /> {appliedCoupon.message}
-                                        </p>
+                                    {/* Applied coupons — stack as many as you like */}
+                                    {appliedCoupons.length > 0 && (
+                                        <div className="mt-2 space-y-1.5">
+                                            {appliedCoupons.map((c) => (
+                                                <div key={c.code} className="flex items-center justify-between gap-2 bg-white border border-green-200 rounded px-2.5 py-1.5">
+                                                    <span className="flex items-center gap-1.5 text-xs font-semibold text-green-700 min-w-0">
+                                                        <LuCheck size={12} className="flex-shrink-0" />
+                                                        <span className="truncate">{c.code}</span>
+                                                        <span className="text-[11px] font-medium text-gray-400 flex-shrink-0">
+                                                            {c.freeShipping && c.discount === 0 ? 'Free shipping' : `−৳${(c.discount || 0).toLocaleString()}`}
+                                                        </span>
+                                                    </span>
+                                                    <button
+                                                        onClick={() => handleRemoveCoupon(c.code)}
+                                                        className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                                                        aria-label={`Remove ${c.code}`}
+                                                    >
+                                                        <LuX size={13} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -656,17 +681,19 @@ const CartPage = () => {
                                     <span className="text-gray-500">Subtotal ({selectedQty} {selectedQty === 1 ? 'item' : 'items'})</span>
                                     <span className="text-gray-900 font-medium">৳{selectedSubtotal.toLocaleString()}</span>
                                 </div>
-                                {appliedCoupon && (
+                                {couponDiscount > 0 && (
                                     <div className="flex justify-between text-sm text-green-600">
                                         <span className="flex items-center gap-1">
                                             <LuTag size={12} />
-                                            Coupon ({appliedCoupon.code})
+                                            Coupon{appliedCoupons.length > 1 ? `s (${appliedCoupons.length})` : ` (${appliedCoupons.find(c => c.discount > 0)?.code || ''})`}
                                         </span>
-                                        {appliedCoupon.freeShipping && appliedCoupon.discount === 0 ? (
-                                            <span className="font-medium">Free shipping</span>
-                                        ) : (
-                                            <span className="font-medium">-৳{appliedCoupon.discount.toLocaleString()}</span>
-                                        )}
+                                        <span className="font-medium">-৳{couponDiscount.toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {couponFreeShipping && (
+                                    <div className="flex justify-between text-sm text-green-600">
+                                        <span className="flex items-center gap-1"><LuTag size={12} /> Free shipping coupon</span>
+                                        <span className="font-medium">Applied</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-sm">
@@ -688,8 +715,8 @@ const CartPage = () => {
                                 <div className="flex justify-between items-center pt-3 mt-1 border-t border-gray-100">
                                     <span className="text-sm font-semibold text-gray-900">Total</span>
                                     <div className="text-right">
-                                        {appliedCoupon && (
-                                            <p className="text-xs line-through text-gray-400">৳{(selectedSubtotal + shippingCost).toLocaleString()}</p>
+                                        {(couponDiscount > 0 || couponFreeShipping) && preDiscountTotal > finalTotal && (
+                                            <p className="text-xs line-through text-gray-400">৳{preDiscountTotal.toLocaleString()}</p>
                                         )}
                                         <span className="text-xl font-bold text-[var(--color-primary)]">৳{finalTotal.toLocaleString()}</span>
                                     </div>

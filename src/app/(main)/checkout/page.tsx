@@ -15,8 +15,11 @@ import {
 } from 'react-icons/lu';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
-
-const COUPON_STORAGE_KEY = 'anandabazarbdmart_applied_coupon';
+import {
+    type AppliedCoupon,
+    loadAppliedCoupons, clearAppliedCoupons,
+    couponDiscountTotal, couponHasFreeShipping,
+} from '@/lib/coupons';
 
 // ─── Payment methods offered: bKash + SSLCommerz + Cash on Delivery ──────────
 // (bKash account number/instructions come dynamically from site settings)
@@ -108,7 +111,7 @@ const CheckoutPage = () => {
     });
     const [copied, setCopied] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; finalAmount: number } | null>(null);
+    const [appliedCoupons, setAppliedCoupons] = useState<AppliedCoupon[]>([]);
     // Set once an order is successfully placed → drives the success modal.
     const [placedOrder, setPlacedOrder] = useState<{ _id?: string; orderId?: string } | null>(null);
 
@@ -134,13 +137,12 @@ const CheckoutPage = () => {
         setErrors({});
     };
 
-    // Load coupon from cart page
+    // Load coupons from the cart page (supports multiple stacked coupons)
     useEffect(() => {
-        try {
-            const saved = localStorage.getItem(COUPON_STORAGE_KEY);
-            if (saved) setAppliedCoupon(JSON.parse(saved));
-        } catch {}
+        setAppliedCoupons(loadAppliedCoupons());
     }, []);
+    const couponDiscount = couponDiscountTotal(appliedCoupons);
+    const couponFreeShipping = couponHasFreeShipping(appliedCoupons);
 
     // ─── Shipping quote (debounced on city; recomputes when subtotal changes) ──
     const [debouncedCity, setDebouncedCity] = useState('');
@@ -155,8 +157,9 @@ const CheckoutPage = () => {
     );
 
     // Fall back to a sensible default so a number always shows while the quote loads.
-    const shippingCost = shippingQuote?.shippingCost ?? (totalPrice >= 5000 ? 0 : 120);
-    const freeShipping = shippingQuote?.freeShipping ?? (totalPrice >= 5000);
+    // A free-shipping coupon overrides the quote (the server applies the same rule).
+    const freeShipping = couponFreeShipping || (shippingQuote?.freeShipping ?? (totalPrice >= 5000));
+    const shippingCost = freeShipping ? 0 : (shippingQuote?.shippingCost ?? (totalPrice >= 5000 ? 0 : 120));
     const estimatedDays = shippingQuote?.estimatedDays ?? '3-5 days';
     const FREE_REASON_LABEL: Record<string, string> = {
         threshold: 'Order qualifies', coupon: 'Coupon applied', product: 'Free-delivery items', quantity: 'Bulk order',
@@ -302,7 +305,9 @@ const CheckoutPage = () => {
                 paymentTime: paymentDetails.paymentTime,
             } : {},
             shippingCost,
-            ...(appliedCoupon ? { couponCode: appliedCoupon.code, discount: appliedCoupon.discount } : {}),
+            ...(appliedCoupons.length > 0
+                ? { couponCodes: appliedCoupons.map((c) => c.code), discount: couponDiscount }
+                : {}),
         };
 
         // Every online gateway (bKash / Nagad / Rocket / SSLCommerz) hands the
@@ -335,7 +340,7 @@ const CheckoutPage = () => {
                 const result = await createOrder(orderPayload).unwrap();
                 items.forEach((i: any) => dispatch(removeFromCart(i.id)));
                 try { localStorage.removeItem('anandabazarbdmart_selected_cart'); } catch {}
-                localStorage.removeItem(COUPON_STORAGE_KEY);
+                clearAppliedCoupons();
                 await persistAddressIfNeeded();
 
                 if (isGatewayMethod) {
@@ -352,7 +357,7 @@ const CheckoutPage = () => {
                 const result = await guestCheckout(orderPayload).unwrap();
                 items.forEach((i: any) => dispatch(removeFromCart(i.id)));
                 try { localStorage.removeItem('anandabazarbdmart_selected_cart'); } catch {}
-                localStorage.removeItem(COUPON_STORAGE_KEY);
+                clearAppliedCoupons();
 
                 if (result.data?.accessToken && result.data?.user) {
                     const userData = result.data.user;
@@ -392,8 +397,8 @@ const CheckoutPage = () => {
 
     const isSubmitting = isPlacingOrder || isGuestPlacing || isInitiatingPayment;
 
-    // Total = (subtotal − coupon discount) + shippingCost
-    const baseAmount = totalPrice - (appliedCoupon?.discount ?? 0);
+    // Total = (subtotal − total coupon discount, floored at 0) + shippingCost
+    const baseAmount = Math.max(0, totalPrice - couponDiscount);
     const orderTotal = baseAmount + shippingCost;
     const totalQuantity = items.reduce((a, i) => a + i.quantity, 0);
 
@@ -752,12 +757,18 @@ const CheckoutPage = () => {
                                         <span className="text-gray-500">Subtotal ({totalQuantity} item{totalQuantity > 1 ? 's' : ''})</span>
                                         <span className="text-gray-900">৳{totalPrice.toLocaleString()}</span>
                                     </div>
-                                    {appliedCoupon && (
+                                    {couponDiscount > 0 && (
                                         <div className="flex justify-between text-sm text-green-600">
                                             <span className="flex items-center gap-1">
-                                                <LuTag size={12} /> Coupon ({appliedCoupon.code})
+                                                <LuTag size={12} /> Coupon{appliedCoupons.length > 1 ? `s (${appliedCoupons.length})` : ` (${appliedCoupons.find(c => c.discount > 0)?.code || ''})`}
                                             </span>
-                                            <span className="font-medium">-৳{appliedCoupon.discount.toLocaleString()}</span>
+                                            <span className="font-medium">-৳{couponDiscount.toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                    {couponFreeShipping && (
+                                        <div className="flex justify-between text-sm text-green-600">
+                                            <span className="flex items-center gap-1"><LuTag size={12} /> Free shipping coupon</span>
+                                            <span className="font-medium">Applied</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between text-sm">
@@ -779,8 +790,8 @@ const CheckoutPage = () => {
                                     <div className="flex justify-between items-center pt-3 mt-1 border-t border-gray-100">
                                         <span className="text-sm font-semibold text-gray-900">Total</span>
                                         <div className="text-right">
-                                            {appliedCoupon && (
-                                                <p className="text-xs line-through text-gray-400">৳{(totalPrice + shippingCost).toLocaleString()}</p>
+                                            {(couponDiscount > 0 || couponFreeShipping) && (
+                                                <p className="text-xs line-through text-gray-400">৳{(totalPrice + (couponFreeShipping ? (shippingQuote?.shippingCost ?? (totalPrice >= 5000 ? 0 : 120)) : shippingCost)).toLocaleString()}</p>
                                             )}
                                             <span className="text-xl font-bold text-[var(--color-primary)]">
                                                 ৳{orderTotal.toLocaleString()}
