@@ -20,12 +20,17 @@ interface AuthGuardProps {
 function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     const router = useRouter();
     const pathname = usePathname();
-    const { user, token, isAuthenticated } = useSelector((state: RootState) => state.auth);
+    const { user, token, isAuthenticated, isRestoring } = useSelector((state: RootState) => state.auth);
 
     // Hydration flag: avoid SSR mismatch and don't flash a redirect before
     // the persisted auth state / localStorage token is available on the client.
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); }, []);
+
+    // On a refresh the saved token is still in localStorage but the user has to
+    // be fetched again (see restoreSession in redux/provider). Until that
+    // settles we know nothing — deciding now would log a signed-in user out.
+    const settling = !mounted || isRestoring;
 
     // Resolve a token from either Redux or localStorage (in case the slice
     // hasn't rehydrated the token yet but it persists in storage).
@@ -51,7 +56,7 @@ function AuthGuard({ children, requiredRole }: AuthGuardProps) {
         (!!user?.role && allowedRoles.includes(user.role));
 
     useEffect(() => {
-        if (!mounted) return;
+        if (settling) return;
 
         if (!authed) {
             const redirect = encodeURIComponent(pathname || '/');
@@ -62,10 +67,10 @@ function AuthGuard({ children, requiredRole }: AuthGuardProps) {
         if (!roleAllowed) {
             router.replace('/');
         }
-    }, [mounted, authed, roleAllowed, pathname, router]);
+    }, [settling, authed, roleAllowed, pathname, router]);
 
-    // Still hydrating: render a lightweight loader.
-    if (!mounted) {
+    // Still hydrating / restoring the session: render a lightweight loader.
+    if (settling) {
         return (
             <div style={{
                 minHeight: '60vh', display: 'flex', alignItems: 'center',

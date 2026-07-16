@@ -22,6 +22,12 @@ interface AuthState {
     isAuthenticated: boolean;
     isLoading: boolean;
     error: string | null;
+    /**
+     * True until the stored session has been checked on first load. Redux state
+     * is lost on every refresh, so a saved token has to be exchanged for the
+     * user again — guards must wait for this instead of assuming logged-out.
+     */
+    isRestoring: boolean;
 }
 
 const initialState: AuthState = {
@@ -30,6 +36,7 @@ const initialState: AuthState = {
     isAuthenticated: false,
     isLoading: false,
     error: null,
+    isRestoring: true,
 };
 
 const authSlice = createSlice({
@@ -47,6 +54,7 @@ const authSlice = createSlice({
             state.user = action.payload.user;
             state.token = action.payload.token;
             state.error = null;
+            state.isRestoring = false;
         },
 
         loginFailure: (state, action: PayloadAction<string>) => {
@@ -55,6 +63,7 @@ const authSlice = createSlice({
             state.user = null;
             state.token = null;
             state.error = action.payload;
+            state.isRestoring = false;
         },
 
         logout: (state) => {
@@ -63,6 +72,12 @@ const authSlice = createSlice({
             state.isAuthenticated = false;
             state.isLoading = false;
             state.error = null;
+            state.isRestoring = false;
+        },
+
+        /** No saved session to restore, or the check finished/failed. */
+        sessionRestoreFinished: (state) => {
+            state.isRestoring = false;
         },
 
         updateUser: (state, action: PayloadAction<Partial<User>>) => {
@@ -88,6 +103,7 @@ export const {
     loginSuccess,
     loginFailure,
     logout,
+    sessionRestoreFinished,
     updateUser,
     updateAddress,
     clearError

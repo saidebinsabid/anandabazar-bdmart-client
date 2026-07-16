@@ -12,12 +12,12 @@ interface ThemeContextType {
     isLoaded: boolean;
 }
 
-const DEFAULT_LOGO = '/images/logo.png';
-
+// No stand-in logo on purpose: falling back to a bundled image meant a logo the
+// admin never chose kept reappearing in Appearance settings. Empty = "not set".
 const defaultTheme: ThemeContextType = {
     primaryColor: '#F85606',
     secondaryColor: '#f97316',
-    logoUrl: DEFAULT_LOGO,
+    logoUrl: '',
     faviconUrl: '',
     isLoaded: false,
 };
@@ -108,7 +108,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setThemeData({
             primaryColor: primary,
             secondaryColor: secondary,
-            logoUrl: t.logoUrl || DEFAULT_LOGO,
+            logoUrl: t.logoUrl || '',
             faviconUrl: t.faviconUrl || '',
             isLoaded: true,
         });
