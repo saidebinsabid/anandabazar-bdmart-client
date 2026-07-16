@@ -136,7 +136,9 @@ export default function SettingsPage() {
     const theme = formData.theme || {};
 
     return (
-        <div className="space-y-6 max-w-5xl">
+        // max-w-5xl kept the form narrow but without mx-auto it hugged the left
+        // edge and left a wide gap on the right — centre it in the page.
+        <div className="space-y-6 max-w-5xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
