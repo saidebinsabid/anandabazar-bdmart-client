@@ -64,7 +64,7 @@ export default function ContactClient() {
     });
 
     /* ─── Normalize WhatsApp number to wa.me format (88 + local, digits only) ─── */
-    const waDigits = (c.whatsapp || '01688500771').replace(/\D/g, '');
+    const waDigits = (c.whatsapp || '').replace(/\D/g, '');
     const waNumber = waDigits.startsWith('880')
         ? waDigits
         : waDigits.startsWith('0')
@@ -73,48 +73,51 @@ export default function ContactClient() {
                 ? '880' + waDigits
                 : '';
 
-    /* ─── Contact defaults (Anandabazar BDMart) ─── */
+    /* ─── Contact details — site-content only. Baked-in copies rendered before the
+       query resolved (flashing on load) and went stale the moment the admin edited
+       them in Settings, so a card only appears once its value is actually known. ─── */
     const PHONE_LIST: string[] = (Array.isArray(c.phones) && c.phones.length > 0)
         ? c.phones
-        : (c.phone ? [c.phone] : ['+8801688500771', '+8801931277113']);
-    const WEBSITE: string = c.website || 'anandabazarbdmart.com';
+        : (c.phone ? [c.phone] : []);
+    const WEBSITE: string = c.website || '';
     const PRIMARY_PHONE = PHONE_LIST[0];
-    const PRIMARY_EMAIL: string = c.email || c.emails?.[0] || 'anandabazarbdmart@gmail.com';
+    const PRIMARY_EMAIL: string = c.email || c.emails?.[0] || '';
+    const OFFICE: string = c.corporateOffice || c.address || '';
 
     /* ─── Dynamic Data ─── */
     const CONTACT_CARDS = [
-        {
+        ...(PRIMARY_PHONE ? [{
             icon: <LuPhone size={22} />,
             label: 'Call Us',
             primary: PHONE_LIST.join(' / '),
             secondary: 'Sun – Thu, 9 AM – 6 PM',
             href: `tel:${PRIMARY_PHONE}`,
             accent: 'var(--color-primary)',
-        },
+        }] : []),
         ...(waNumber ? [{
             icon: <BsWhatsapp size={22} />,
             label: 'WhatsApp',
-            primary: c.whatsapp || '01688500771',
+            primary: c.whatsapp || '',
             secondary: 'Quick reply within minutes',
             href: `https://wa.me/${waNumber}`,
             accent: '#25D366',
         }] : []),
-        {
+        ...(PRIMARY_EMAIL ? [{
             icon: <LuMail size={22} />,
             label: 'Email Us',
             primary: PRIMARY_EMAIL,
             secondary: 'We reply within 24 hours',
             href: `mailto:${PRIMARY_EMAIL}`,
             accent: '#4F46E5',
-        },
-        {
+        }] : []),
+        ...(OFFICE ? [{
             icon: <LuMapPin size={22} />,
             label: 'Corporate Office',
-            primary: c.corporateOffice || c.address || '39/C, Uttar Pirerbug, Kamal Soroni Rd, Mirpur-2, Dhaka-1216',
+            primary: OFFICE,
             secondary: 'Sun – Thu, 9 AM – 6 PM',
-            href: `https://maps.google.com/?q=${encodeURIComponent(c.corporateOffice || '39/C, Uttar Pirerbug, Kamal Soroni Rd, Mirpur-2, Dhaka-1216')}`,
+            href: `https://maps.google.com/?q=${encodeURIComponent(OFFICE)}`,
             accent: 'var(--color-secondary)',
-        },
+        }] : []),
     ];
 
     const HOURS = (c.hours || []).map((h: any) => ({ day: h.day, time: h.time }));

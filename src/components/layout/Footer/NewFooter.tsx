@@ -71,16 +71,18 @@ const NewFooter: React.FC = () => {
     const socials: { label: string; url: string }[] = (siteRes?.data?.contact?.socials || [])
         .filter((s: any) => s?.url && s.url !== '#');
 
-    // Contact info from DB with sensible Anandabazar BDMart defaults
+    // Contact info comes from the DB only. Baked-in defaults used to render before
+    // the query resolved, so the old details flashed on every load — and would keep
+    // flashing the stale value once the admin edits them in Settings.
     const contact = siteRes?.data?.contact || {};
     const phoneList: string[] = (Array.isArray(contact.phones) && contact.phones.length > 0)
         ? contact.phones
-        : (contact.phone ? [contact.phone] : ['+8801688500771', '+8801931277113']);
-    const contactEmail: string = contact.email || contact.emails?.[0] || 'anandabazarbdmart@gmail.com';
-    const address: string = contact.address || contact.corporateOffice || '39/C, Uttar Pirerbug, Kamal Soroni Rd, Mirpur-2, Dhaka-1216';
+        : (contact.phone ? [contact.phone] : []);
+    const contactEmail: string = contact.email || contact.emails?.[0] || '';
+    const address: string = contact.address || contact.corporateOffice || '';
 
     // WhatsApp link for "Live Chat" — normalized to wa.me format (88 + local digits)
-    const waDigits = (siteRes?.data?.contact?.whatsapp || siteRes?.data?.floating?.whatsapp || '01688500771').replace(/\D/g, '');
+    const waDigits = (siteRes?.data?.contact?.whatsapp || siteRes?.data?.floating?.whatsapp || '').replace(/\D/g, '');
     const waNumber = !waDigits ? '' : waDigits.startsWith('880') ? waDigits : waDigits.startsWith('0') ? '88' + waDigits : '880' + waDigits;
     const whatsappLink = waNumber ? `https://wa.me/${waNumber}` : '';
 
@@ -100,14 +102,18 @@ const NewFooter: React.FC = () => {
                     {/* Brand + Address + Social */}
                     <div className="sm:col-span-2 lg:col-span-1">
                         <div className="space-y-1.5">
-                            <div className="flex items-start gap-2.5">
-                                <LuMapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                                <p className="text-sm text-gray-500">{address}</p>
-                            </div>
-                            <div className="flex items-center gap-2.5">
-                                <LuMail size={14} className="text-gray-400 shrink-0" />
-                                <a href={`mailto:${contactEmail}`} className="text-sm text-gray-500 hover:text-[var(--color-primary)] transition-colors break-all">{contactEmail}</a>
-                            </div>
+                            {address && (
+                                <div className="flex items-start gap-2.5">
+                                    <LuMapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                                    <p className="text-sm text-gray-500">{address}</p>
+                                </div>
+                            )}
+                            {contactEmail && (
+                                <div className="flex items-center gap-2.5">
+                                    <LuMail size={14} className="text-gray-400 shrink-0" />
+                                    <a href={`mailto:${contactEmail}`} className="text-sm text-gray-500 hover:text-[var(--color-primary)] transition-colors break-all">{contactEmail}</a>
+                                </div>
+                            )}
                         </div>
                         {/* Social Icons — dynamic from admin / site-content */}
                         {socials.length > 0 && (

@@ -55,26 +55,15 @@ function resolveIcon(name: string, dbIcon?: string): string {
     return '📦';
 }
 
-const FALLBACK_CATEGORIES: Category[] = [
-    { _id: 'f-electronics',  name: 'Electronics',          slug: 'electronics',        icon: '📱' },
-    { _id: 'f-fashion',      name: 'Fashion & Clothing',   slug: 'fashion-clothing',   icon: '👗' },
-    { _id: 'f-home',         name: 'Home & Kitchen',       slug: 'home-kitchen',       icon: '🏠' },
-    { _id: 'f-health',       name: 'Health & Beauty',      slug: 'health-beauty',      icon: '💊' },
-    { _id: 'f-sports',       name: 'Sports & Outdoors',    slug: 'sports-outdoors',    icon: '⚽' },
-    { _id: 'f-books',        name: 'Books & Stationery',   slug: 'books-stationery',   icon: '📚' },
-    { _id: 'f-grocery',      name: 'Grocery & Food',       slug: 'grocery-food',       icon: '🛒' },
-    { _id: 'f-toys',         name: 'Toys & Kids',          slug: 'toys-kids',          icon: '🧸' },
-    { _id: 'f-shoes',        name: 'Shoes & Footwear',     slug: 'shoes-footwear',     icon: '👟' },
-    { _id: 'f-accessories',  name: 'Watches & Accessories',slug: 'watches-accessories',icon: '⌚' },
-];
-
 const CategoryExpertise: React.FC<CategoryExpertiseProps> = ({ onClose }) => {
     // Only categories the admin has toggled to show on the homepage.
-    const { data: categoriesData } = useGetCategoriesQuery({ home: true });
+    const { data: categoriesData, isLoading } = useGetCategoriesQuery({ home: true });
     const apiCategories: Category[] = categoriesData?.data || [];
     // Only show top-level categories (not sub-categories) in the featured strip.
-    const topLevel = apiCategories.filter((c) => !c.parent);
-    const categories: Category[] = topLevel.length > 0 ? topLevel : FALLBACK_CATEGORIES;
+    // There is deliberately no hardcoded stand-in list: it used to render for the
+    // moment before the real categories arrived, flashing invented categories that
+    // don't exist in the store and whose links 400.
+    const categories: Category[] = apiCategories.filter((c) => !c.parent);
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +71,27 @@ const CategoryExpertise: React.FC<CategoryExpertiseProps> = ({ onClose }) => {
         if (!scrollRef.current) return;
         scrollRef.current.scrollBy({ left: dir === 'left' ? -360 : 360, behavior: 'smooth' });
     };
+
+    // Loading: hold the strip's space with neutral tiles — never stand-in content.
+    if (isLoading) {
+        return (
+            <section className="w-full bg-white border-b border-gray-100">
+                <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-5">
+                    <div className="h-5 w-40 rounded bg-gray-100 animate-pulse mb-4" />
+                    <div className="flex gap-2 sm:gap-4 justify-center">
+                        {[...Array(6)].map((_, i) => (
+                            <div key={i} className="flex-shrink-0 flex flex-col items-center gap-1.5 sm:gap-2.5 w-[76px] sm:w-[130px]">
+                                <div className="w-[72px] h-[72px] sm:w-[128px] sm:h-[128px] rounded-md bg-gray-100 animate-pulse" />
+                                <div className="h-3 w-14 rounded bg-gray-100 animate-pulse" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        );
+    }
+    // Loaded with nothing to show — render no strip at all.
+    if (categories.length === 0) return null;
 
     return (
         <section id="home-categories" className="w-full scroll-mt-24 bg-white border-b border-gray-100">

@@ -23,19 +23,6 @@ interface Category {
     icon?: string;
 }
 
-const FALLBACK_CATEGORIES: Category[] = [
-    { _id: 'f-electronics',  name: 'Electronics',           slug: 'electronics',         icon: '📱' },
-    { _id: 'f-fashion',      name: 'Fashion & Clothing',    slug: 'fashion-clothing',    icon: '👗' },
-    { _id: 'f-home',         name: 'Home & Kitchen',        slug: 'home-kitchen',        icon: '🏠' },
-    { _id: 'f-health',       name: 'Health & Beauty',       slug: 'health-beauty',       icon: '💊' },
-    { _id: 'f-sports',       name: 'Sports & Outdoors',     slug: 'sports-outdoors',     icon: '⚽' },
-    { _id: 'f-books',        name: 'Books & Stationery',    slug: 'books-stationery',    icon: '📚' },
-    { _id: 'f-grocery',      name: 'Grocery & Food',        slug: 'grocery-food',        icon: '🛒' },
-    { _id: 'f-toys',         name: 'Toys & Kids',           slug: 'toys-kids',           icon: '🧸' },
-    { _id: 'f-shoes',        name: 'Shoes & Footwear',      slug: 'shoes-footwear',      icon: '👟' },
-    { _id: 'f-accessories',  name: 'Watches & Accessories', slug: 'watches-accessories', icon: '⌚' },
-];
-
 const Header: React.FC = () => {
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -58,13 +45,17 @@ const Header: React.FC = () => {
     // Storefront wishlist page handles both logged-in (server) and guest (local) wishlists.
     const wishlistHref = '/wishlist';
 
-    // Only categories the admin has toggled to show in the menu.
+    // Only categories the admin has toggled to show in the menu. No hardcoded
+    // stand-in list: it rendered before the real ones arrived, flashing invented
+    // categories on every reload — and their links 400 because they don't exist.
     const { data: categoriesData } = useGetCategoriesQuery({ menu: true });
-    const categories: Category[] = categoriesData?.data?.length > 0 ? categoriesData.data : FALLBACK_CATEGORIES;
+    const categories: Category[] = categoriesData?.data || [];
     const { data: siteContentRes } = useGetSiteContentQuery(undefined);
     const contact = siteContentRes?.data?.contact || {};
-    const contactPhone: string = contact.phone || '+8801688500771';
-    const contactEmail: string = contact.email || 'anandabazarbdmart@gmail.com';
+    // No hardcoded stand-in: a baked-in number would flash the old value on every
+    // load once the admin edits the real one in Settings. Unknown → show nothing.
+    const contactPhone: string = contact.phone || '';
+    const contactEmail: string = contact.email || '';
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 8);
@@ -120,14 +111,18 @@ const Header: React.FC = () => {
                     <div className="container mx-auto px-4">
                         <div className="flex items-center justify-between h-9">
                             <div className="flex items-center gap-5 text-[11.5px] text-gray-500">
-                                <a href={`tel:${contactPhone}`} className="flex items-center gap-1.5 hover:text-gray-800 transition-colors">
-                                    <LuPhone size={11} strokeWidth={2} />
-                                    <span>{contactPhone}</span>
-                                </a>
-                                <a href={`mailto:${contactEmail}`} className="flex items-center gap-1.5 hover:text-gray-800 transition-colors">
-                                    <LuMail size={11} strokeWidth={2} />
-                                    <span>{contactEmail}</span>
-                                </a>
+                                {contactPhone && (
+                                    <a href={`tel:${contactPhone}`} className="flex items-center gap-1.5 hover:text-gray-800 transition-colors">
+                                        <LuPhone size={11} strokeWidth={2} />
+                                        <span>{contactPhone}</span>
+                                    </a>
+                                )}
+                                {contactEmail && (
+                                    <a href={`mailto:${contactEmail}`} className="flex items-center gap-1.5 hover:text-gray-800 transition-colors">
+                                        <LuMail size={11} strokeWidth={2} />
+                                        <span>{contactEmail}</span>
+                                    </a>
+                                )}
                             </div>
                             <div className="flex items-center gap-5 text-[11.5px] text-gray-500">
                                 <span className="flex items-center gap-2.5">

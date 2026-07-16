@@ -9,19 +9,6 @@ import { LuChevronDown, LuX, LuSearch, LuFilter, LuStar } from 'react-icons/lu';
 
 const LIMIT = 24;
 
-const FALLBACK_CATEGORIES = [
-    { _id: 'f-electronics', name: 'Electronics', icon: '📱' },
-    { _id: 'f-fashion', name: 'Fashion & Clothing', icon: '👗' },
-    { _id: 'f-home', name: 'Home & Kitchen', icon: '🏠' },
-    { _id: 'f-health', name: 'Health & Beauty', icon: '💊' },
-    { _id: 'f-sports', name: 'Sports & Outdoors', icon: '⚽' },
-    { _id: 'f-books', name: 'Books & Stationery', icon: '📚' },
-    { _id: 'f-grocery', name: 'Grocery & Food', icon: '🛒' },
-    { _id: 'f-toys', name: 'Toys & Kids', icon: '🧸' },
-    { _id: 'f-shoes', name: 'Shoes & Footwear', icon: '👟' },
-    { _id: 'f-accessories', name: 'Watches & Accessories', icon: '⌚' },
-];
-
 const SORT_OPTIONS = [
     { label: 'Best Match', value: '' },
     { label: 'Newest First', value: '-createdAt' },
@@ -64,6 +51,7 @@ const FilterPanel: React.FC<{
     brands: string[];
     selectedBrand: string;
     showCategoryFilter: boolean;
+    categoriesLoading: boolean;
     showSearch: boolean;
     onCategorySelect: (id: string) => void;
     onPriceChange: (range: FilterState) => void;
@@ -77,7 +65,7 @@ const FilterPanel: React.FC<{
 }> = ({
     categories, selectedCategory, priceRange, minRating, inStockOnly, localSearch,
     brands, selectedBrand,
-    showCategoryFilter, showSearch,
+    showCategoryFilter, categoriesLoading, showSearch,
     onCategorySelect, onPriceChange, onRatingChange, onInStockChange, onSearchChange, onSearchSubmit,
     onBrandSelect,
     onClear, hasActiveFilters,
@@ -163,15 +151,23 @@ const FilterPanel: React.FC<{
             {showCategoryFilter && (
                 <div>
                     <SectionHeader title="Categories" />
-                    <ul className="space-y-0.5">
-                        {renderCategoryRow({ _id: '', name: 'All Categories', productCount: 0 })}
-                        {categoryTree.map((root: any) => (
-                            <React.Fragment key={root._id}>
-                                {renderCategoryRow(root)}
-                                {root.children.map((child: any) => renderCategoryRow(child, true))}
-                            </React.Fragment>
-                        ))}
-                    </ul>
+                    {categoriesLoading ? (
+                        <div className="space-y-1.5 py-1">
+                            {[...Array(6)].map((_, i) => (
+                                <div key={i} className="h-6 rounded bg-gray-100 animate-pulse" />
+                            ))}
+                        </div>
+                    ) : (
+                        <ul className="space-y-0.5">
+                            {renderCategoryRow({ _id: '', name: 'All Categories', productCount: 0 })}
+                            {categoryTree.map((root: any) => (
+                                <React.Fragment key={root._id}>
+                                    {renderCategoryRow(root)}
+                                    {root.children.map((child: any) => renderCategoryRow(child, true))}
+                                </React.Fragment>
+                            ))}
+                        </ul>
+                    )}
                 </div>
             )}
 
@@ -387,12 +383,10 @@ const StoreListing: React.FC<StoreListingProps> = ({
 
     const showCategoryFilter = !lockedCategory && !hideCategoryFilter;
 
-    /* categories */
-    const { data: categoriesData } = useGetCategoriesQuery({});
-    const categories = useMemo(() => {
-        const api = categoriesData?.data;
-        return api?.length > 0 ? api : FALLBACK_CATEGORIES;
-    }, [categoriesData]);
+    /* categories — no hardcoded stand-in list: it rendered while the query was
+       still loading, flashing invented categories that don't exist in the store. */
+    const { data: categoriesData, isLoading: categoriesLoading } = useGetCategoriesQuery({});
+    const categories = useMemo(() => categoriesData?.data || [], [categoriesData]);
 
     /* brands (server-provided distinct list) */
     const { data: brandsData } = useGetBrandsQuery(undefined);
@@ -517,6 +511,7 @@ const StoreListing: React.FC<StoreListingProps> = ({
         brands,
         selectedBrand,
         showCategoryFilter,
+        categoriesLoading,
         showSearch: true,
         onCategorySelect: handleCategorySelect,
         onPriceChange: setPriceRange,

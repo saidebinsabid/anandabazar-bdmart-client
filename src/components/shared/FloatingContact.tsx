@@ -31,13 +31,15 @@ const FloatingContact: React.FC = () => {
     const payment = res?.data?.payment || {};
 
     const showWhatsapp = f?.showWhatsapp !== false; // default true
-    const digits = (f?.whatsapp || contact.whatsapp || '01688500771').replace(/\D/g, '');
+    const digits = (f?.whatsapp || contact.whatsapp || '').replace(/\D/g, '');
     const whatsappNumber = digits.startsWith('880') ? digits : digits.startsWith('0') ? '88' + digits : digits ? '880' + digits : '';
     const whatsappLink = whatsappNumber ? `https://wa.me/${whatsappNumber}` : '';
 
-    const phone = contact.phone || '+8801688500771';
-    const email = 'anandabazarbdmart@gmail.com';
-    const address = contact.address || '39/C, Uttar Pirerbug, Kamal Soroni Rd, Mirpur-2, Dhaka-1216';
+    // Straight from site-content — no baked-in copies. They rendered before the
+    // query resolved (flashing on load) and email never tracked Settings at all.
+    const phone = contact.phone || '';
+    const email = contact.email || contact.emails?.[0] || '';
+    const address = contact.address || '';
 
     // ── Chat state ──────────────────────────────────────────────
     const [open, setOpen] = useState(false);
@@ -109,15 +111,24 @@ const FloatingContact: React.FC = () => {
                         : "📦 Please log in to track your orders — then you’ll see live status for each one.",
                     actions: [{ label: isAuthenticated ? 'Open My Orders' : 'Login to track', href: isAuthenticated ? '/dashboard/user/orders' : '/login?redirect=/dashboard/user/orders' }],
                 };
-            case 'contact':
+            case 'contact': {
+                // Only list details the store has actually set.
+                const lines = [
+                    phone && `• Phone: ${phone}`,
+                    email && `• Email: ${email}`,
+                    address && `• Address: ${address}`,
+                ].filter(Boolean);
                 return {
                     from: 'bot',
-                    text: `📞 We’re here to help:\n• Phone: ${phone}\n• Email: ${email}\n• Address: ${address}`,
+                    text: lines.length
+                        ? `📞 We’re here to help:\n${lines.join('\n')}`
+                        : `📞 We’re here to help — please see our Contact page for the latest details.`,
                     actions: [
                         ...(whatsappLink ? [{ label: 'Chat on WhatsApp', href: whatsappLink }] : []),
                         { label: 'Contact page', href: '/contact' },
                     ],
                 };
+            }
             default:
                 return { from: 'bot', text: "I’m here to help! Pick a topic below 👇", actions: QUICK };
         }
