@@ -565,23 +565,26 @@ function LegalPagesTab() {
 function HeroSlidesTab({ data, setData, onSave, isSaving }: { data: any; setData: any; onSave: () => void; isSaving: boolean }) {
     const slides = data.heroSlides || [];
 
+    // The homepage carousel re-sorts slides by their numeric `order`, so every mutation
+    // must renumber `order` to match the array position — otherwise reordering/removal
+    // saves fine but the live homepage restores the original sequence.
+    const renumber = (arr: any[]) => arr.map((s: any, i: number) => ({ ...s, order: i }));
+    const commit = (arr: any[]) => setData((p: any) => ({ ...p, heroSlides: renumber(arr) }));
+
     const addSlide = (imageUrl: string) => {
         if (!imageUrl) return;
-        const newSlides = [...slides, { imageUrl, active: true, order: slides.length }];
-        setData((p: any) => ({ ...p, heroSlides: newSlides }));
+        commit([...slides, { imageUrl, active: true }]);
     };
 
     // Bulk-add: append every uploaded image as a new slide.
     const addSlides = (urls: string[]) => {
         const clean = (urls || []).filter(Boolean);
         if (!clean.length) return;
-        const newSlides = [...slides, ...clean.map((imageUrl, i) => ({ imageUrl, active: true, order: slides.length + i }))];
-        setData((p: any) => ({ ...p, heroSlides: newSlides }));
+        commit([...slides, ...clean.map((imageUrl) => ({ imageUrl, active: true }))]);
     };
 
     const removeSlide = (idx: number) => {
-        const newSlides = slides.filter((_: any, i: number) => i !== idx);
-        setData((p: any) => ({ ...p, heroSlides: newSlides }));
+        commit(slides.filter((_: any, i: number) => i !== idx));
     };
 
     const moveSlide = (idx: number, direction: 'up' | 'down') => {
@@ -589,7 +592,7 @@ function HeroSlidesTab({ data, setData, onSave, isSaving }: { data: any; setData
         const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
         if (swapIdx < 0 || swapIdx >= newSlides.length) return;
         [newSlides[idx], newSlides[swapIdx]] = [newSlides[swapIdx], newSlides[idx]];
-        setData((p: any) => ({ ...p, heroSlides: newSlides }));
+        commit(newSlides);
     };
 
     const handleSaveHero = async () => {

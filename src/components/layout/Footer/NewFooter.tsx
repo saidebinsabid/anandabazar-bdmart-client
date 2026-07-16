@@ -76,7 +76,7 @@ const NewFooter: React.FC = () => {
     const phoneList: string[] = (Array.isArray(contact.phones) && contact.phones.length > 0)
         ? contact.phones
         : (contact.phone ? [contact.phone] : ['+8801688500771', '+8801931277113']);
-    const contactEmail = 'anandabazarbdmart@gmail.com';
+    const contactEmail: string = contact.email || contact.emails?.[0] || 'anandabazarbdmart@gmail.com';
     const address: string = contact.address || contact.corporateOffice || '39/C, Uttar Pirerbug, Kamal Soroni Rd, Mirpur-2, Dhaka-1216';
 
     // WhatsApp link for "Live Chat" — normalized to wa.me format (88 + local digits)

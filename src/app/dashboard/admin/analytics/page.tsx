@@ -131,7 +131,7 @@ export default function ReportAnalysisPage() {
     // ── Export handlers ──
     const exportOrders = () => {
         const data = filteredOrders.map((o: any) => ({
-            OrderNo: o.orderNumber || '',
+            OrderNo: o.orderId || '',
             Customer: o.user?.firstName ? `${o.user.firstName} ${o.user.lastName || ''}` : o.guestInfo?.name || 'Guest',
             Email: o.user?.email || o.shippingAddress?.email || '',
             Phone: o.shippingAddress?.phone || o.guestInfo?.phone || '',
@@ -151,7 +151,7 @@ export default function ReportAnalysisPage() {
             Price: p.price || 0,
             TotalSold: p.totalSold || 0,
             Stock: p.stock || 0,
-            Rating: p.averageRating?.toFixed(1) || '0',
+            Rating: p.rating?.toFixed(1) || '0',
         }));
         exportToExcel(data, 'products_report');
     };
@@ -397,7 +397,7 @@ export default function ReportAnalysisPage() {
                                     const sc = statusConfig[order.status] || statusConfig.pending;
                                     return (
                                         <tr key={i} className="border-t border-gray-50 hover:bg-gray-50/50">
-                                            <td className="px-4 py-2.5 font-semibold text-gray-700">{order.orderNumber}</td>
+                                            <td className="px-4 py-2.5 font-semibold text-gray-700">{order.orderId}</td>
                                             <td className="px-4 py-2.5 text-gray-600">
                                                 {order.user?.firstName ? `${order.user.firstName} ${order.user.lastName || ''}` : order.guestInfo?.name || 'Guest'}
                                             </td>
@@ -462,8 +462,8 @@ export default function ReportAnalysisPage() {
                                             <span className={`font-semibold ${(product.stock || 0) > 0 ? 'text-green-600' : 'text-red-500'}`}>{product.stock || 0}</span>
                                         </td>
                                         <td className="px-4 py-2.5 text-right">
-                                            {product.averageRating > 0 ? (
-                                                <span className="text-amber-500 flex items-center gap-0.5 justify-end"><LuStar size={11} /> {product.averageRating.toFixed(1)}</span>
+                                            {product.rating > 0 ? (
+                                                <span className="text-amber-500 flex items-center gap-0.5 justify-end"><LuStar size={11} /> {product.rating.toFixed(1)}</span>
                                             ) : <span className="text-gray-300">—</span>}
                                         </td>
                                     </tr>

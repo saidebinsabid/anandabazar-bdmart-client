@@ -11,8 +11,8 @@ import {
 import {
     useGetAdminUsersQuery,
     useGetAdminUserStatsQuery,
-    useUpdateUserMutation,
 } from '@/redux/api/userApi';
+import { useUpdateUserRoleMutation } from '@/redux/api/roleApi';
 import { useRegisterMutation } from '@/redux/api/authApi';
 import toast from 'react-hot-toast';
 
@@ -75,18 +75,22 @@ export default function CustomersPage() {
         page, limit: 10,
         role: roleFilter !== 'all' ? roleFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
-        search: search || undefined
+        // Backend QueryBuilder.search() reads `searchTerm` (not `search`)
+        searchTerm: search || undefined
     });
 
     const { data: statsData, isLoading: isStatsLoading, refetch: refetchStats } = useGetAdminUserStatsQuery(undefined);
-    const [updateUser, { isLoading: isUpdatingUser }] = useUpdateUserMutation();
+    // Role changes must go through the role module (PATCH /roles/:userId); the generic
+    // admin update (PATCH /users/admin/:id) intentionally ignores `role`. This endpoint
+    // is superadmin-gated, so a non-superadmin gets a clear 403 instead of a silent no-op.
+    const [updateUserRole, { isLoading: isUpdatingRole }] = useUpdateUserRoleMutation();
     const [registerUser, { isLoading: isCreating }] = useRegisterMutation();
 
     const handleRefresh = () => { refetchUsers(); refetchStats(); toast.success('Data refreshed'); };
 
     const handleRoleChange = async (userId: string, newRole: string) => {
         try {
-            await updateUser({ id: userId, role: newRole }).unwrap();
+            await updateUserRole({ userId, role: newRole, permissions: [] }).unwrap();
             toast.success(`Role updated to ${newRole}`);
             setEditingRole(null);
             refetchUsers();
@@ -109,9 +113,9 @@ export default function CustomersPage() {
             const res = await registerUser({ ...createForm }).unwrap();
             const newUserId = res?.data?.user?._id;
 
-            // Step 2: Promote to admin
+            // Step 2: Promote to admin via the role module (superadmin-gated)
             if (newUserId) {
-                await updateUser({ id: newUserId, role: 'admin' }).unwrap();
+                await updateUserRole({ userId: newUserId, role: 'admin', permissions: [] }).unwrap();
             }
 
             toast.success('Admin account created!');
@@ -131,13 +135,14 @@ export default function CustomersPage() {
 
     const customers = usersData?.data || [];
     const meta = usersData?.meta || { totalPages: 1, total: 0 };
-    const stats = statsData?.data || { totalUsers: 0, activeUsers: 0, blockedUsers: 0, totalCustomers: 0 };
+    // Backend getAdminStats returns { total, active, blocked, admins, users, newUsersThisMonth }
+    const stats = statsData?.data || { total: 0, active: 0, blocked: 0, newUsersThisMonth: 0 };
 
     const statCards = [
-        { label: 'Total Users', value: stats.totalUsers || meta.total, icon: LuUsers, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-        { label: 'Active', value: stats.activeUsers, icon: LuUserCheck, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
-        { label: 'Blocked', value: stats.blockedUsers, icon: LuUserX, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
-        { label: 'New This Month', value: 12, icon: LuCalendar, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
+        { label: 'Total Users', value: stats.total ?? meta.total, icon: LuUsers, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+        { label: 'Active', value: stats.active ?? 0, icon: LuUserCheck, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
+        { label: 'Blocked', value: stats.blocked ?? 0, icon: LuUserX, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+        { label: 'New This Month', value: stats.newUsersThisMonth ?? 0, icon: LuCalendar, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
     ];
 
     const inputStyle = "w-full px-3 py-2.5 border border-gray-200 rounded-md text-sm outline-none focus:border-[var(--color-primary)] transition-colors";
@@ -268,7 +273,7 @@ export default function CustomersPage() {
                                                     <select
                                                         defaultValue={user.role}
                                                         onChange={(e) => handleRoleChange(user._id, e.target.value)}
-                                                        disabled={isUpdatingUser}
+                                                        disabled={isUpdatingRole}
                                                         className="text-xs border border-[var(--color-primary)] rounded-md px-2 py-1.5 outline-none bg-white font-bold"
                                                     >
                                                         <option value="user">User</option>

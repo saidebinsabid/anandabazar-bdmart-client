@@ -592,7 +592,7 @@ const AdminDashboard: React.FC = () => {
                                                 background: catColors[i % catColors.length],
                                                 display: 'inline-block',
                                             }} />
-                                            {cat._id || cat.category || 'Other'}
+                                            {cat.name || cat.category || 'Other'}
                                         </span>
                                         <span style={{ fontSize: '11px', fontWeight: 700, color: '#333' }}>
                                             {percentage}% ({cat.count || cat.totalSales || 0})

@@ -79,7 +79,7 @@ export default function ContactClient() {
         : (c.phone ? [c.phone] : ['+8801688500771', '+8801931277113']);
     const WEBSITE: string = c.website || 'anandabazarbdmart.com';
     const PRIMARY_PHONE = PHONE_LIST[0];
-    const PRIMARY_EMAIL = 'anandabazarbdmart@gmail.com';
+    const PRIMARY_EMAIL: string = c.email || c.emails?.[0] || 'anandabazarbdmart@gmail.com';
 
     /* ─── Dynamic Data ─── */
     const CONTACT_CARDS = [

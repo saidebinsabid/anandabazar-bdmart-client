@@ -8,7 +8,7 @@ import {
     LuLayoutGrid, LuLogOut, LuMenu, LuX, LuChevronDown,
     LuShoppingCart, LuUser, LuChevronLeft,
     LuLayoutDashboard, LuChartColumn, LuTruck, LuTag, LuStar, LuMapPin,
-    LuSettings, LuBell, LuSearch, LuCreditCard, LuZap, LuShield, LuRefreshCw,
+    LuSettings, LuBell, LuSearch, LuCreditCard, LuZap, LuShield, LuRefreshCw, LuMail,
 } from 'react-icons/lu';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import Logo from '@/components/shared/Logo';
@@ -58,6 +58,7 @@ const menuSections = [
             { name: 'Coupons', href: '/dashboard/admin/coupons', icon: LuTag, submenu: null },
             { name: 'Offers & Flash Sales', href: '/dashboard/admin/offers', icon: LuZap, submenu: null },
             { name: 'Reviews', href: '/dashboard/admin/reviews', icon: LuStar, submenu: null },
+            { name: 'Newsletter', href: '/dashboard/admin/newsletter', icon: LuMail, submenu: null },
         ],
     },
     // Money flow — payments collected from customers
