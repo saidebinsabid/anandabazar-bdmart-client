@@ -5,13 +5,21 @@ import { LuX, LuCloudUpload, LuFileText, LuCircleCheck, LuTriangleAlert, LuDownl
 import { useBulkUploadProductsMutation } from '@/redux/api/productApi';
 import { toast } from 'react-hot-toast';
 
-// Columns parsed from the CSV. `images` is pipe-separated (url1|url2|url3).
+// Columns parsed from the CSV.
+// `category`/`subCategory` accept the category NAME (e.g. "Electronics") or its id.
+// Pipe-separated columns (images/tags/colors/sizes) take multiple values: a|b|c.
 const COLUMNS = [
-    'name', 'price', 'thumbnail', 'category', 'description', 'stock',
-    'brand', 'model', 'weight', 'boxSize', 'insideTheBox', 'images',
+    // core
+    'name', 'price', 'originalPrice', 'costPrice', 'thumbnail', 'images',
+    'category', 'subCategory', 'description', 'stock', 'status',
+    // specs
+    'brand', 'model', 'weight', 'boxSize', 'insideTheBox',
+    // filters + image search
+    'tags', 'colors', 'sizes',
 ];
 
-const NUMERIC = new Set(['price', 'stock']);
+const NUMERIC = new Set(['price', 'stock', 'originalPrice', 'costPrice']);
+const PIPE_ARRAYS = new Set(['images', 'tags', 'colors', 'sizes']);
 
 type ParsedRow = Record<string, any> & { __rowIndex: number; __errors: string[] };
 
@@ -50,7 +58,7 @@ export default function BulkUploadModal({ onClose }: { onClose: () => void }) {
         headers.forEach((h, i) => {
             const key = h.trim();
             let val: any = (cells[i] ?? '').trim();
-            if (key === 'images') {
+            if (PIPE_ARRAYS.has(key)) {
                 val = val ? String(val).split('|').map((u: string) => u.trim()).filter(Boolean) : [];
             } else if (NUMERIC.has(key)) {
                 val = val === '' ? '' : Number(val);
@@ -65,6 +73,19 @@ export default function BulkUploadModal({ onClose }: { onClose: () => void }) {
         if (!row.description) row.__errors.push('description is required');
         const imgCount = [row.thumbnail, ...(Array.isArray(row.images) ? row.images : [])].filter(Boolean).length;
         if (imgCount < 3) row.__errors.push('at least 3 images required (thumbnail + 2 in images, pipe-separated)');
+        // Optional numbers: only validated when a value was actually given.
+        (['originalPrice', 'costPrice', 'stock'] as const).forEach((k) => {
+            if (row[k] !== '' && row[k] !== undefined && (isNaN(Number(row[k])) || Number(row[k]) < 0)) {
+                row.__errors.push(`${k} must be a number (0 or more)`);
+            }
+        });
+        if (row.originalPrice !== '' && row.originalPrice !== undefined
+            && Number(row.originalPrice) > 0 && Number(row.originalPrice) < Number(row.price)) {
+            row.__errors.push('originalPrice should be higher than price (it is the struck-through price)');
+        }
+        if (row.status && !['active', 'draft', 'out-of-stock'].includes(String(row.status))) {
+            row.__errors.push('status must be active, draft or out-of-stock');
+        }
         return row;
     };
 
@@ -106,7 +127,28 @@ export default function BulkUploadModal({ onClose }: { onClose: () => void }) {
 
     const downloadTemplate = () => {
         const header = COLUMNS.join(',');
-        const sample = 'Sample Product,1200,https://img/thumb.jpg,<categoryId>,A great product,50,Acme,AC-100,500 g,30x20x15 cm,1x item|1x manual,https://img/2.jpg|https://img/3.jpg';
+        // One realistic, filled-in example row so the format is obvious at a glance.
+        const sample = [
+            'Sony WH-1000XM4 Wireless Headphone', // name
+            '28500',                              // price
+            '32000',                              // originalPrice (struck-through)
+            '24000',                              // costPrice (needed for net profit)
+            'https://res.cloudinary.com/demo/image/upload/xm4-1.jpg',                                      // thumbnail
+            'https://res.cloudinary.com/demo/image/upload/xm4-2.jpg|https://res.cloudinary.com/demo/image/upload/xm4-3.jpg', // images
+            'Electronics',                        // category (NAME or id)
+            '',                                   // subCategory (optional)
+            '"Industry-leading noise cancelling, 30-hour battery and touch controls."', // description
+            '25',                                 // stock
+            'active',                             // status
+            'Sony',                               // brand
+            'WH-1000XM4',                         // model
+            '254 g',                              // weight
+            '25x20x8 cm',                         // boxSize
+            '1x Headphone|1x Case|1x Cable',      // insideTheBox
+            'headphone|audio|wireless|noise-cancelling', // tags
+            'black|silver',                       // colors
+            '',                                   // sizes
+        ].join(',');
         const blob = new Blob([header + '\n' + sample + '\n'], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -122,7 +164,17 @@ export default function BulkUploadModal({ onClose }: { onClose: () => void }) {
             toast.error('No valid rows to upload. Fix the highlighted errors first.');
             return;
         }
-        const products = validRows.map(({ __rowIndex, __errors, ...rest }) => rest);
+        // Drop blank cells so optional fields are OMITTED rather than sent as ""
+        // (an empty string would fail the backend's number/enum validation).
+        const products = validRows.map(({ __rowIndex, __errors, ...rest }) => {
+            const clean: Record<string, any> = {};
+            Object.entries(rest).forEach(([k, v]) => {
+                if (v === '' || v === undefined || v === null) return;
+                if (Array.isArray(v) && v.length === 0) return;
+                clean[k] = v;
+            });
+            return clean;
+        });
         try {
             const res: any = await bulkUpload({ products }).unwrap();
             const data = res?.data || res;
@@ -152,8 +204,12 @@ export default function BulkUploadModal({ onClose }: { onClose: () => void }) {
                             <div className="bg-indigo-50 border border-indigo-100 rounded-md p-4 text-xs text-indigo-700 space-y-1">
                                 <p className="font-bold">Expected columns (header row):</p>
                                 <p className="font-mono break-all">{COLUMNS.join(', ')}</p>
-                                <p><strong>images</strong> column = pipe-separated URLs (e.g. <span className="font-mono">url2|url3</span>). Thumbnail + images must total at least 3.</p>
-                                <p><strong>category</strong> = the category ObjectId.</p>
+                                <p><strong>Required:</strong> name, price, thumbnail, category, description — everything else is optional (leave the cell blank to skip it).</p>
+                                <p><strong>category / subCategory</strong> = just the category <strong>name</strong> (e.g. <span className="font-mono">Electronics</span>) — the id also works.</p>
+                                <p><strong>images, tags, colors, sizes</strong> = pipe-separated (e.g. <span className="font-mono">url2|url3</span>). Thumbnail + images must total at least 3.</p>
+                                <p><strong>costPrice</strong> = what you paid — required for the net-profit report. <strong>originalPrice</strong> = the struck-through “was” price.</p>
+                                <p><strong>tags / colors</strong> power the filters and “search by image”, so fill them in when you can.</p>
+                                <p><strong>status</strong> = <span className="font-mono">active</span> (default), <span className="font-mono">draft</span> or <span className="font-mono">out-of-stock</span>.</p>
                                 <button onClick={downloadTemplate} className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-white border border-indigo-200 rounded-md font-bold text-indigo-600 hover:bg-indigo-100">
                                     <LuDownload size={13} /> Download CSV template
                                 </button>
