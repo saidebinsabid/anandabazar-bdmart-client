@@ -11,6 +11,7 @@ import {
     LuMapPin, LuTruck, LuDollarSign, LuRefreshCw, LuShield, LuClock
 } from 'react-icons/lu';
 import { useGetProductBySlugQuery, useGetRelatedProductsQuery, useIncrementProductStatMutation } from '@/redux/api/productApi';
+import { useGetSiteContentQuery } from '@/redux/api/siteContentApi';
 import { useGetProductReviewsQuery, useCreateReviewMutation } from '@/redux/api/reviewApi';
 import { useAppDispatch, useAppSelector } from '@/redux';
 import { addToCart } from '@/redux/slices/cartSlice';
@@ -91,6 +92,11 @@ export default function ProductDetailsPage() {
         { skip: !product?._id || !product?.category?._id }
     );
     const relatedProducts = relatedData?.data || [];
+
+    // Ship-from location for the delivery box — from site-content, so editing it in
+    // Settings updates it here too (it used to be a hardcoded address string).
+    const { data: siteContentRes } = useGetSiteContentQuery(undefined);
+    const shipsFrom: string = siteContentRes?.data?.contact?.address || '';
 
     const { data: reviewsData } = useGetProductReviewsQuery({ productId: product?._id }, { skip: !product?._id });
     const reviews = reviewsData?.data || [];
@@ -584,10 +590,12 @@ export default function ProductDetailsPage() {
                             {/* Delivery Options */}
                             <div style={{ padding: '14px', borderBottom: '1px solid #f0f0f0' }}>
                                 <p style={{ fontSize: '13px', fontWeight: 700, color: '#111', margin: '0 0 10px' }}>Delivery Options</p>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
-                                    <LuMapPin size={15} style={{ color: '#6b7280', flexShrink: 0, marginTop: '1px' }} />
-                                    <span style={{ fontSize: '12px', color: '#444', lineHeight: 1.4 }}>Mirpur-2, Dhaka-1216</span>
-                                </div>
+                                {shipsFrom && (
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '12px' }}>
+                                        <LuMapPin size={15} style={{ color: '#6b7280', flexShrink: 0, marginTop: '1px' }} />
+                                        <span style={{ fontSize: '12px', color: '#444', lineHeight: 1.4 }}>{shipsFrom}</span>
+                                    </div>
+                                )}
                                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px' }}>
                                     <LuTruck size={15} style={{ color: '#6b7280', flexShrink: 0, marginTop: '1px' }} />
                                     <div style={{ flex: 1 }}>
