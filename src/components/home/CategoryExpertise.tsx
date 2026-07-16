@@ -140,25 +140,13 @@ const CategoryExpertise: React.FC<CategoryExpertiseProps> = ({ onClose }) => {
                                     href={`/products?category=${cat._id}`}
                                     className="flex-shrink-0 flex flex-col items-center gap-1.5 sm:gap-2.5 group w-[76px] sm:w-[130px]"
                                 >
-                                    {/* Tile — a real category photo when the admin has set one,
-                                        otherwise fall back to the emoji so nothing looks empty. */}
+                                    {/* Icon tile */}
                                     <div
-                                        className="w-[72px] h-[72px] sm:w-[128px] sm:h-[128px] rounded-md bg-white border border-gray-200 overflow-hidden flex items-center justify-center transition-all duration-200 group-hover:border-orange-300 group-hover:shadow-md"
+                                        className="w-[72px] h-[72px] sm:w-[128px] sm:h-[128px] rounded-md bg-white border border-gray-200 flex items-center justify-center transition-all duration-200 group-hover:border-orange-300 group-hover:shadow-md group-hover:bg-orange-50"
                                     >
-                                        {cat.image ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img
-                                                src={cat.image}
-                                                alt={cat.name}
-                                                // This strip sits high on the homepage — only six small tiles, so
-                                                // load them straight away rather than lazily popping them in.
-                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                                            />
-                                        ) : (
-                                            <span className="text-3xl sm:text-6xl select-none transition-transform duration-200 group-hover:scale-110">
-                                                {resolveIcon(cat.name, cat.icon)}
-                                            </span>
-                                        )}
+                                        <span className="text-3xl sm:text-6xl select-none transition-transform duration-200 group-hover:scale-110">
+                                            {resolveIcon(cat.name, cat.icon)}
+                                        </span>
                                     </div>
 
                                     {/* Label */}
