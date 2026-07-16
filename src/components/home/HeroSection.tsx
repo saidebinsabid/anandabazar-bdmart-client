@@ -6,11 +6,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { LuChevronLeft, LuChevronRight } from 'react-icons/lu';
 import { useGetSiteContentQuery } from '@/redux/api/siteContentApi';
 
-// Shown only when the admin hasn't uploaded any hero slides yet.
-const FALLBACK_IMAGES = [
-    '/images/heroimg.avif',
-    '/images/heroimg-3.jpg',
-];
 const SLIDE_INTERVAL = 6000; // ms per slide
 const FADE_MS = 800;         // crossfade duration
 
@@ -26,15 +21,17 @@ type HeroSlide = { imageUrl: string; active?: boolean; order?: number };
  * Honors prefers-reduced-motion.
  */
 const HeroSection: React.FC = () => {
-    const { data } = useGetSiteContentQuery(undefined);
+    const { data, isLoading } = useGetSiteContentQuery(undefined);
     const reduce = !!useReducedMotion();
 
+    // Only ever the admin's own banners — there is deliberately no stand-in image
+    // to fall back on, because a placeholder banner would flash on every load
+    // before the real ones arrive.
     const images = React.useMemo(() => {
-        const slides = ((data?.data?.heroSlides || []) as HeroSlide[])
+        return ((data?.data?.heroSlides || []) as HeroSlide[])
             .filter((s) => s?.imageUrl && s.active !== false)
             .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
             .map((s) => s.imageUrl);
-        return slides.length > 0 ? slides : FALLBACK_IMAGES;
     }, [data]);
 
     const multiple = images.length > 1;
@@ -79,6 +76,25 @@ const HeroSection: React.FC = () => {
         if (multiple && Math.abs(dx) > 48) goTo(active + (dx < 0 ? 1 : -1));
         touchX.current = null;
     };
+
+    // While the banners are still loading, hold the space with a neutral
+    // placeholder rather than a stand-in image — that is what used to flash the
+    // old banner on every reload. (Every hook above has already run, so these
+    // early returns are safe.)
+    if (isLoading) {
+        return (
+            <section className="w-full" aria-label="Featured banners">
+                <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-5">
+                    <div
+                        className="w-full animate-pulse rounded-2xl bg-slate-100 ring-1 ring-black/5 max-h-[260px] sm:max-h-[340px] md:max-h-[420px] lg:max-h-[480px]"
+                        style={{ aspectRatio: String(activeRatio) }}
+                    />
+                </div>
+            </section>
+        );
+    }
+    // Loaded, but the admin hasn't added any banners — show nothing at all.
+    if (images.length === 0) return null;
 
     return (
         <section className="w-full" aria-label="Featured banners">
