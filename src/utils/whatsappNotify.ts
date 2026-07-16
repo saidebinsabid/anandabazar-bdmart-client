@@ -3,7 +3,10 @@
  * Opens wa.me in a new tab with a pre-filled message.
  */
 
-const ADMIN_WHATSAPP = '8801688500771'; // Anandabazar BDMart WhatsApp (with country code)
+// The admin's WhatsApp number comes from site-content (passed in as adminPhone).
+// It is deliberately not hardcoded here: a baked-in number kept messaging the old
+// account after the shop's number changed in Settings. With none configured, the
+// helpers below no-op.
 
 export function sendOrderToWhatsApp(data: {
     adminPhone?: string;
@@ -14,7 +17,7 @@ export function sendOrderToWhatsApp(data: {
     totalPrice?: number;
     note?: string;
 }) {
-    const phone = data.adminPhone || ADMIN_WHATSAPP;
+    const phone = data.adminPhone || '';
     if (!phone) return; // no WhatsApp number configured yet
     const itemLines = data.items.map((item, i) =>
         `${i + 1}. ${item.name || 'Product'} × ${item.quantity}${item.color ? ` (${item.color})` : ''}${item.size ? ` [${item.size}]` : ''}${item.price ? ` — ৳${item.price}` : ''}`
@@ -46,7 +49,7 @@ export function sendInquiryToWhatsApp(data: {
     color?: string;
     size?: string;
 }) {
-    const phone = data.adminPhone || ADMIN_WHATSAPP;
+    const phone = data.adminPhone || '';
     if (!phone) return; // no WhatsApp number configured yet
     const variantInfo = [data.color, data.size].filter(Boolean).join(' / ');
 
