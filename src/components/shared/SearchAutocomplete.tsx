@@ -2,8 +2,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { LuSearch, LuMic, LuX } from 'react-icons/lu';
+import { LuSearch, LuMic, LuX, LuCamera } from 'react-icons/lu';
 import { useSuggestProductsQuery } from '@/redux/api/productApi';
+import ImageSearchModal from '@/components/shared/ImageSearchModal';
 
 /* ───────────────────────── Web Speech API typing ─────────────────────────
    The Web Speech API is not in the standard TS DOM lib, so we declare the
@@ -86,6 +87,7 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
     const [debounced, setDebounced] = useState('');
     const [listening, setListening] = useState(false);
     const [speechSupported, setSpeechSupported] = useState(false);
+    const [showImageSearch, setShowImageSearch] = useState(false);
 
     const rootRef = useRef<HTMLDivElement>(null);
     const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -223,6 +225,20 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
                     aria-label="Search"
                     autoComplete="off"
                 />
+
+                {/* Image / visual search */}
+                <button
+                    type="button"
+                    onClick={() => setShowImageSearch(true)}
+                    aria-label="Search by image"
+                    title="Search by image"
+                    className={`shrink-0 flex items-center justify-center rounded-full transition-colors hover:bg-[var(--color-primary-lightest)] ${
+                        isMobile ? 'w-8 h-8' : 'w-9 h-9'
+                    }`}
+                    style={{ color: 'var(--color-primary)' }}
+                >
+                    <LuCamera size={isMobile ? 15 : 17} strokeWidth={2} />
+                </button>
 
                 {/* Voice search mic — hidden when unsupported */}
                 {speechSupported && (
@@ -364,6 +380,9 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({
                     </button>
                 </div>
             )}
+
+            {/* Visual / image search */}
+            <ImageSearchModal open={showImageSearch} onClose={() => setShowImageSearch(false)} />
         </div>
     );
 };
